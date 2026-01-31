@@ -11,6 +11,7 @@ KKPPプロジェクトの反省を踏まえ、「認証基盤として必要な�
 | [01-scope.md](./01-scope.md) | スコープ定義：OPの責務境界と設計思想 |
 | [02-domain-model.md](./02-domain-model.md) | ドメインモデル・DB設計 |
 | [03-api-design.md](./03-api-design.md) | APIインターフェース設計 |
+| [04-tech-stack.md](./04-tech-stack.md) | 技術選定・アーキテクチャ方針・ディレクトリ構成 |
 
 ## このガイドの前提
 
