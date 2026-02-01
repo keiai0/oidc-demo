@@ -10,6 +10,11 @@ OIDC（OpenID Connect）準拠の認証基盤（OP: OpenID Provider）と動作�
 | `op/frontend/` | OP管理UI（Next.js、静的出力） |
 | `rp/` | 動作検証用RP（Next.js / Drizzle ORM） |
 
+## セットアップ
+```bash
+cp .env.example .env
+```
+
 ## 起動方法
 
 Docker Compose の profiles で起動対象を切り替える。
