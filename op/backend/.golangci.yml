@@ -1,0 +1,22 @@
+linters:
+  enable:
+    - errcheck       # 未チェックの error を検出
+    - govet          # go vet の拡張チェック
+    - staticcheck    # 高品質な静的解析
+    - unused         # 未使用の変数・関数を検出
+    - ineffassign    # 効果のない代入を検出
+    - misspell       # スペルミスを検出
+    - errorlint      # errors.Is/As の正しい使い方を検証
+    - gocritic       # 追加のコードスタイルチェック
+
+linters-settings:
+  gocritic:
+    enabled-tags:
+      - diagnostic
+    disabled-checks:
+      - commentFormatting  # 日本語コメントとの相性が悪い
+
+issues:
+  exclude-dirs:
+    - tmp
+    - migrations
