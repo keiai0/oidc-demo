@@ -1,0 +1,97 @@
+services:
+  # ===========================================================================
+  # PostgreSQL
+  # ===========================================================================
+  postgres:
+    image: postgres:17-alpine
+    profiles: [op, rp, all]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # OP Backend (Go + Echo + Air hot reload)
+  # ===========================================================================
+  op-backend:
+    build:
+      context: ./op/backend
+      target: dev
+    profiles: [op, all]
+    environment:
+      OP_BACKEND_PORT: ${OP_BACKEND_PORT}
+      OP_BACKEND_DSN: ${OP_BACKEND_DSN}
+      OP_BACKEND_ISSUER_BASE_URL: ${OP_BACKEND_ISSUER_BASE_URL}
+      OP_KEY_ENCRYPTION_KEY: ${OP_KEY_ENCRYPTION_KEY}
+      OP_LOGIN_PAGE_URL: ${OP_LOGIN_PAGE_URL}
+    ports:
+      - "${OP_BACKEND_PORT}:8080"
+    volumes:
+      - ./op/backend:/app
+      - op_backend_go_mod:/go/pkg/mod
+      - op_backend_go_cache:/root/.cache/go-build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ===========================================================================
+  # OP Frontend (Next.js dev server)
+  # ===========================================================================
+  op-frontend:
+    build:
+      context: ./op/frontend
+      target: dev
+    profiles: [op, all]
+    environment:
+      NEXT_PUBLIC_OP_API_URL: ${NEXT_PUBLIC_OP_API_URL}
+    ports:
+      - "${OP_FRONTEND_PORT}:3000"
+    volumes:
+      - ./op/frontend/src:/app/src
+      - ./op/frontend/public:/app/public
+
+  # ===========================================================================
+  # RP (Next.js dev server)
+  # ===========================================================================
+  rp:
+    build:
+      context: ./rp
+      target: dev
+    profiles: [rp, all]
+    environment:
+      RP_DATABASE_URL: ${RP_DATABASE_URL}
+      RP_OIDC_ISSUER: ${RP_OIDC_ISSUER}
+      RP_OIDC_CLIENT_ID: ${RP_OIDC_CLIENT_ID}
+      RP_OIDC_CLIENT_SECRET: ${RP_OIDC_CLIENT_SECRET}
+      RP_OIDC_REDIRECT_URI: ${RP_OIDC_REDIRECT_URI}
+    ports:
+      - "${RP_PORT}:3000"
+    volumes:
+      - ./rp/src:/app/src
+      - ./rp/public:/app/public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  op_backend_go_mod:
+  op_backend_go_cache:
