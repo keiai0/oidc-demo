@@ -30,6 +30,18 @@ docker compose --profile rp up -d
 docker compose --profile all up -d
 ```
 
+## DB管理
+
+マイグレーションはサーバー起動時にも自動実行されるが、手動でも実行できる。
+
+```bash
+# マイグレーション実行
+docker compose exec op-backend go run cmd/migrate/main.go
+
+# 開発用シードデータ投入
+docker compose exec op-backend go run cmd/seed/main.go
+```
+
 ## ポート
 
 | サービス | ポート |

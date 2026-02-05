@@ -36,11 +36,14 @@ docs/plan/     — 実装計画
 - Refresh Token: Rotation + Reuse Detection (RFC 9700)
 - シークレットをソースコードにハードコードしない
 
-## マイグレーション
+## マイグレーション・シード
 
-- golang-migrate 形式: `NNNNNN_description.{up,down}.sql`
+- DDL: `op/backend/db/migrations/` — golang-migrate 形式、テーブルごとに分割
+- seed: `op/backend/db/seeds/` — 開発用テストデータ（マイグレーション管理外）
+- マイグレーションはサーバー起動時に自動実行
+- seed は `docker compose exec op-backend go run cmd/seed/main.go` で手動実行
 - up と down は必ずペアで作成する
-- seed データとスキーマ変更は別ファイルに分離する
+- `COMMENT ON TABLE` / `COMMENT ON COLUMN` でメタデータコメントを付ける
 
 ## ドキュメント
 
