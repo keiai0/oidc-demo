@@ -46,6 +46,21 @@ infrastructure/ → port/ の実装（GORM, jwx, argon2id 等）
 - JWS ヘッダ: `jws.NewHeaders()` + `jws.WithProtectedHeaders()`
 - トークンクレーム取得: `token.Get(name, &dst)`
 
+## DB管理
+
+```
+db/
+├── migrations/   # DDL（テーブルごとに分割、golang-migrate 形式）
+└── seeds/        # 開発用テストデータ（マイグレーション管理外）
+```
+
+- マイグレーションはサーバー起動時に自動実行される（`cmd/server/main.go`）
+- マイグレーション手動実行: `go run cmd/migrate/main.go`
+- seed は手動実行（本番では実行しない）: `go run cmd/seed/main.go`
+
+- マイグレーション追加時はテーブル単位で `NNNNNN_create_xxx.{up,down}.sql` を作成
+- `COMMENT ON TABLE` / `COMMENT ON COLUMN` でメタデータコメントを付ける
+
 ## 開発コマンド
 
 ```bash
