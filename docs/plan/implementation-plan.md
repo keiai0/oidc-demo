@@ -104,10 +104,9 @@ Phase 6: SLO（シングルログアウト）
   - `users`, `credentials`, `password_credentials`, `password_histories`
   - `sessions`, `authorization_codes`, `access_tokens`, `refresh_tokens`, `id_tokens`
   - `sign_keys`
-- [ ] GORM初期化（`infrastructure/database/database.go`）
-- [ ] 各テーブルの `domain/` struct 定義（GORMタグ付き）
-- [ ] 各 `port/repository/` interface 定義
-- [ ] 各 `infrastructure/repository/` GORM実装
+- [ ] GORM初期化（`database/database.go`）
+- [ ] 各テーブルの `model/` struct 定義（GORMタグ付き）
+- [ ] 各 `store/` GORM実装
 
 ### 1-2. JWT署名鍵管理
 
@@ -124,7 +123,7 @@ Phase 6: SLO（シングルログアウト）
 
 ### 1-4. 認証フロー（内部API）
 
-- [ ] `infrastructure/crypto/` パスワードハッシュ実装（argon2id）
+- [ ] `crypto/` パスワードハッシュ実装（argon2id）
 - [ ] `POST /internal/login` 実装（ID/パスワード検証 → セッション発行）
 - [ ] `GET /internal/me` 実装（セッション確認）
 - [ ] ログイン画面（OP frontend）の実装
@@ -267,7 +266,7 @@ Phase 6: SLO（シングルログアウト）
 ### タスク
 
 - [ ] `mfa_configs` / `totp_configs` テーブルのマイグレーション追加
-- [ ] `infrastructure/totp/` 実装
+- [ ] `crypto/totp/` 実装
   - シークレット生成・暗号化保存
   - TOTP検証（リプレイ攻撃防止: `last_used_step` チェック）
     - **仕様参照:** RFC 6238 Section 5.2
@@ -293,7 +292,7 @@ Phase 6: SLO（シングルログアウト）
 ### タスク
 
 - [ ] `webauthn_credentials` テーブルのマイグレーション追加
-- [ ] `infrastructure/webauthn/` 実装
+- [ ] `crypto/webauthn/` 実装
   - 登録フロー（credential作成・公開鍵保存・sign_countの初期化）
   - 認証フロー（assertion検証・sign_countの更新）
     - **仕様参照:** WebAuthn Level 2 Section 7.2（認証アサーションの検証手順）

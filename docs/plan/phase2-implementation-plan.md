@@ -53,14 +53,13 @@ zod                       ← スキーマバリデーション
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/handler/management/middleware.go` | APIキー認証ミドルウェア |
-| `internal/handler/management/error.go` | 管理API共通エラーレスポンス |
-| `internal/handler/management/request.go` | 共通リクエストバリデーション・ページネーション |
-| `internal/handler/management/response.go` | 共通レスポンス構造体（一覧・詳細） |
-| `internal/port/repository/tenant_repository.go` | 変更: 一覧取得・作成・更新メソッド追加 |
-| `internal/infrastructure/repository/tenant_repository.go` | 変更: 追加メソッドのGORM実装 |
-| `internal/usecase/management/tenant_usecase.go` | TenantUsecase（一覧・詳細・作成・更新） |
-| `internal/handler/management/tenant_handler.go` | テナント管理ハンドラー |
+| `internal/management/middleware.go` | APIキー認証ミドルウェア |
+| `internal/management/error.go` | 管理API共通エラーレスポンス |
+| `internal/management/request.go` | 共通リクエストバリデーション・ページネーション |
+| `internal/management/response.go` | 共通レスポンス構造体（一覧・詳細） |
+| `internal/store/tenant.go` | 変更: 一覧取得・作成・更新メソッド追加 |
+| `internal/management/tenant.go` | テナント管理（ハンドラ + ロジック一体） |
+| `internal/management/deps.go` | 依存インターフェース |
 | `cmd/server/main.go` | 変更: 管理APIグループ・ミドルウェア・ルート登録 |
 
 ### テナント管理API
@@ -123,11 +122,9 @@ zod                       ← スキーマバリデーション
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/port/repository/client_repository.go` | 変更: 一覧取得・作成・更新・redirect_uri管理メソッド追加 |
-| `internal/infrastructure/repository/client_repository.go` | 変更: 追加メソッドのGORM実装 |
-| `internal/usecase/management/client_usecase.go` | ClientUsecase |
-| `internal/handler/management/client_handler.go` | クライアント管理ハンドラー |
-| `internal/handler/management/redirect_uri_handler.go` | redirect_uri管理ハンドラー |
+| `internal/store/client.go` | 変更: 一覧取得・作成・更新・redirect_uri管理メソッド追加 |
+| `internal/management/client.go` | クライアント管理（ハンドラ + ロジック一体） |
+| `internal/management/redirect_uri.go` | redirect_uri管理 |
 
 ### クライアント管理API
 | メソッド | パス | 説明 |
@@ -219,10 +216,8 @@ zod                       ← スキーマバリデーション
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/port/repository/sign_key_repository.go` | 変更: 一覧取得・無効化メソッド追加 |
-| `internal/infrastructure/repository/sign_key_repository.go` | 変更: 追加メソッドのGORM実装 |
-| `internal/usecase/management/key_usecase.go` | KeyUsecase（一覧・ローテーション・無効化） |
-| `internal/handler/management/key_handler.go` | 鍵管理ハンドラー |
+| `internal/store/sign_key.go` | 変更: 一覧取得・無効化メソッド追加 |
+| `internal/management/key.go` | 鍵管理（ハンドラ + ロジック一体） |
 
 ### 鍵管理API
 | メソッド | パス | 説明 |
@@ -294,13 +289,10 @@ zod                       ← スキーマバリデーション
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/usecase/management/incident_usecase.go` | IncidentUsecase |
-| `internal/handler/management/incident_handler.go` | インシデント対応ハンドラー |
-| `internal/port/repository/session_repository.go` | 変更: 一括失効メソッド追加 |
-| `internal/port/repository/token_repository.go` | 変更: 一括失効メソッド追加 |
-| `internal/infrastructure/repository/session_repository.go` | 変更: 一括失効のGORM実装 |
-| `internal/infrastructure/repository/access_token_repository.go` | 変更: 一括失効のGORM実装 |
-| `internal/infrastructure/repository/refresh_token_repository.go` | 変更: 一括失効のGORM実装 |
+| `internal/management/incident.go` | インシデント対応（ハンドラ + ロジック一体） |
+| `internal/store/session.go` | 変更: 一括失効メソッド追加 |
+| `internal/store/access_token.go` | 変更: 一括失効メソッド追加 |
+| `internal/store/refresh_token.go` | 変更: 一括失効メソッド追加 |
 
 ### インシデント対応API
 | メソッド | パス | 説明 |

@@ -36,11 +36,10 @@ golang.org/x/crypto（直接依存に昇格 - argon2id用）
 | `migrations/000001_create_tables.up.sql` | 14テーブル一括作成（02-domain-model.md準拠） |
 | `migrations/000001_create_tables.down.sql` | 全テーブルDROP |
 | `migrations/000002_seed_data.up.sql` | demo テナント + testuser |
-| `internal/infrastructure/database/database.go` | GORM初期化 |
-| `internal/infrastructure/database/migrate.go` | golang-migrate実行 |
-| `internal/domain/*.go` | 7ファイル: tenant, client, user, credential, session, token, sign_key |
-| `internal/port/repository/*.go` | 7ファイル: 各エンティティのinterface定義 |
-| `internal/infrastructure/repository/*.go` | 9ファイル: GORM実装 |
+| `internal/database/database.go` | GORM初期化 |
+| `internal/database/migrate.go` | golang-migrate実行 |
+| `internal/model/*.go` | 7ファイル: tenant, client, user, credential, session, token, sign_key |
+| `internal/store/*.go` | 9ファイル: GORM実装 |
 | `cmd/server/main.go` | 変更: Config, DB接続, マイグレーション実行 |
 
 ### テーブル一覧（op スキーマ）
@@ -61,15 +60,15 @@ tenants, clients, redirect_uris, post_logout_redirect_uris, users, credentials, 
 - 秘密鍵は AES-256-GCM で暗号化して `sign_keys.private_key_ref` に保存
 - 暗号化キーは環境変数 `OP_KEY_ENCRYPTION_KEY`
 - RSA 2048ビット、kid形式: `{date}-{random8hex}`
-- `port/service/KeyService` interface で将来KMS差替え可能
+- `jwt/deps.go` の KeyService interface で将来KMS差替え可能
 
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/port/service/key_service.go` | KeyService interface |
-| `internal/infrastructure/crypto/aes.go` | AES-256-GCM 暗号化/復号 |
-| `internal/infrastructure/jwt/key_service.go` | KeyService実装（鍵生成・保存・取得・JWKSet） |
-| `internal/handler/oidc/jwks_handler.go` | `GET /jwks` |
+| `internal/crypto/aes.go` | AES-256-GCM 暗号化/復号 |
+| `internal/jwt/key_service.go` | KeyService実装（鍵生成・保存・取得・JWKSet） |
+| `internal/jwt/deps.go` | KeyService interface |
+| `internal/oidc/jwks.go` | `GET /jwks` |
 | `migrations/000003_seed_client.up.sql` | demo-rp クライアント + redirect_uri |
 
 ### 検証
@@ -87,7 +86,7 @@ tenants, clients, redirect_uris, post_logout_redirect_uris, users, credentials, 
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/handler/oidc/discovery_handler.go` | `GET /{tenant_code}/.well-known/openid-configuration` |
+| `internal/oidc/discovery.go` | `GET /{tenant_code}/.well-known/openid-configuration` |
 
 ### 仕様準拠
 - `issuer` 末尾スラッシュなし（MUST: Section 4.1）
@@ -111,11 +110,11 @@ tenants, clients, redirect_uris, post_logout_redirect_uris, users, credentials, 
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/infrastructure/crypto/argon2id.go` | PasswordHasher interface + argon2id実装 |
-| `internal/port/service/auth_service.go` | AuthService interface |
-| `internal/usecase/auth/auth_usecase.go` | Login, ValidateSession 実装 |
-| `internal/handler/internal/login_handler.go` | `POST /internal/login` |
-| `internal/handler/internal/me_handler.go` | `GET /internal/me` |
+| `internal/crypto/argon2id.go` | argon2id ハッシュ・検証 |
+| `internal/auth/login.go` | Login ハンドラ + ロジック |
+| `internal/auth/me.go` | Me ハンドラ + ロジック |
+| `internal/auth/deps.go` | AuthService interface |
+| `internal/auth/errors.go` | 認証エラー定義 |
 | `cmd/seed/main.go` | パスワードハッシュ生成 + シードデータ投入 |
 | `migrations/000004_seed_credentials.up.sql` | testuser のパスワード credential |
 | `op/frontend/src/app/login/page.tsx` | 最小限ログインフォーム |
@@ -150,8 +149,7 @@ OP Frontend (localhost:3000) → OP Backend (localhost:8080) の通信許可
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/usecase/auth/authorize_usecase.go` | AuthorizeUsecase |
-| `internal/handler/oidc/authorize_handler.go` | `GET /{tenant_code}/authorize` |
+| `internal/oidc/authorize.go` | `GET /{tenant_code}/authorize`（ハンドラ + フローロジック一体） |
 
 ### 検証
 - セッションあり → redirect_uri に code + state
@@ -179,11 +177,10 @@ OP Frontend (localhost:3000) → OP Backend (localhost:8080) の通信許可
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/port/service/token_service.go` | TokenService interface |
-| `internal/infrastructure/jwt/token_service.go` | JWT署名・検証（lestrrat-go/jwx v3） |
-| `internal/infrastructure/crypto/pkce.go` | PKCE S256検証 |
-| `internal/usecase/token/token_usecase.go` | TokenUsecase（authorization_code grant） |
-| `internal/handler/oidc/token_handler.go` | `POST /{tenant_code}/token` |
+| `internal/jwt/token_service.go` | JWT署名・検証（lestrrat-go/jwx v3） |
+| `internal/crypto/pkce.go` | PKCE S256検証 |
+| `internal/oidc/token.go` | `POST /{tenant_code}/token`（ルーティング） |
+| `internal/oidc/token_authcode.go` | Authorization Code Grant フロー |
 
 ### 検証
 - 認可コード → トークン交換成功
@@ -207,8 +204,7 @@ OP Frontend (localhost:3000) → OP Backend (localhost:8080) の通信許可
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/usecase/token/userinfo_usecase.go` | UserinfoUsecase |
-| `internal/handler/oidc/userinfo_handler.go` | `GET /{tenant_code}/userinfo` |
+| `internal/oidc/userinfo.go` | `GET /{tenant_code}/userinfo`（ハンドラ + ロジック一体） |
 
 ### 検証
 - Bearer トークンで userinfo 取得
@@ -250,8 +246,7 @@ OP Frontend (localhost:3000) → OP Backend (localhost:8080) の通信許可
 ### 作成ファイル
 | ファイル | 内容 |
 |---------|------|
-| `internal/usecase/token/revoke_usecase.go` | RevokeUsecase |
-| `internal/handler/oidc/revoke_handler.go` | `POST /{tenant_code}/revoke` |
+| `internal/oidc/revoke.go` | `POST /{tenant_code}/revoke`（ハンドラ + ロジック一体） |
 
 ### 検証
 - アクセストークン失効 → userinfo で 401
