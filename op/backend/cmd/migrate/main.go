@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/isurugi-k/oidc-demo/op/backend/config"
-	"github.com/isurugi-k/oidc-demo/op/backend/internal/infrastructure/database"
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/database"
 )
 
 // マイグレーション手動実行ツール
