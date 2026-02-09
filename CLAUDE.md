@@ -19,9 +19,11 @@ rp/            — Next.js 16 (動的, pnpm)
 docker/        — PostgreSQL 設定・初期化スクリプト
 docs/design/   — 設計ドキュメント
 docs/plan/     — 実装計画
+docs/research/ — 参考プロジェクト調査（Hydra・Dex）
 ```
 
 設計の背景・アーキテクチャ方針・パッケージ構成の詳細は `docs/design/04-tech-stack.md` を参照。
+参考プロジェクトから採用すべきパターンは `docs/design/05-reference-patterns.md` を参照。
 
 ## ワークフロー
 
@@ -166,6 +168,16 @@ docker compose exec op-backend go run cmd/seed/main.go
 - **Echo は v4 を使用する**（v5 は不採用）
 - **pnpm を使用する**（npm / yarn ではない）
 - **PostgreSQL スキーマ**: OP 用は `op` スキーマ（`op_user` ロール）、RP 用は `rp` スキーマ（`rp_user` ロール）
+
+## 参考プロジェクトからの指針
+
+Hydra・Dex 調査（`docs/research/`）から抽出した、今後の実装で採用すべきパターン（詳細は `docs/design/05-reference-patterns.md`）:
+
+- **Conformance Test**（Dex）: store の各リポジトリに共通テストスイートを導入する
+- **コンパイル時インターフェースチェック**（Dex）: `var _ Interface = (*Impl)(nil)` を store に追加する
+- **構造化 OIDC エラー型**（Hydra）: Phase 2 で `OIDCError` 型 + Fluent API を導入する
+- **time 関数の注入**（Dex）: テスト用に `time.Now()` を差し替え可能にする
+- **slog への移行**（Dex）: 構造化ロギングを標準ライブラリで統一する
 
 ## 教訓の蓄積
 
