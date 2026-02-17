@@ -295,6 +295,87 @@ POST /{tenant_code}/logout
 
 **冪等性:** 未認証・セッション不明の状態でもエラーにしない。
 
+### 2-8. PAR（Pushed Authorization Requests）エンドポイント
+
+```
+POST /{tenant_code}/par
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic {client_id:client_secret の Base64}
+```
+
+認可リクエストパラメータを事前にPOSTで送信し、`request_uri` を取得する。フロントチャネルへのパラメータ露出を防止。FAPI 2.0 では必須。
+
+**パラメータ:** 認可エンドポイント（2-2）と同一のパラメータをPOSTボディで送信。
+
+**成功レスポンス:**
+```json
+{
+  "request_uri": "urn:ietf:params:oauth:request_uri:abc123",
+  "expires_in": 60
+}
+```
+
+RPは取得した `request_uri` のみで認可エンドポイントにリダイレクトする:
+```
+GET /{tenant_code}/authorize?client_id={client_id}&request_uri={request_uri}
+```
+
+**仕様参照:** RFC 9126 全文
+
+### 2-9. Token Introspectionエンドポイント
+
+```
+POST /{tenant_code}/introspect
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic {client_id:client_secret の Base64}
+```
+
+RPがアクセストークンの有効性をサーバーサイドで確認する。トークン失効後の即時無効化に有効。
+
+**パラメータ:**
+
+| パラメータ | 必須 | 説明 |
+|-----------|------|------|
+| `token` | 必須 | 検証対象のトークン |
+| `token_type_hint` | 任意 | `access_token` / `refresh_token` |
+
+**成功レスポンス（有効なトークン）:**
+```json
+{
+  "active": true,
+  "scope": "openid profile",
+  "client_id": "client-id",
+  "sub": "user-uuid",
+  "exp": 1700003600,
+  "iat": 1700000000,
+  "token_type": "Bearer"
+}
+```
+
+**成功レスポンス（無効なトークン）:**
+```json
+{
+  "active": false
+}
+```
+
+- クライアント認証必須（自身のトークンのみ検証可能）
+- 存在しないトークンでも `active: false` を返す（トークンの存在を推測させない）
+
+**仕様参照:** RFC 7662 全文
+
+### 2-10. ヘルスチェックエンドポイント
+
+```
+GET /health    ← Liveness（アプリケーション生存確認）
+GET /ready     ← Readiness（サービス提供可能か）
+GET /metrics   ← Prometheus メトリクス
+```
+
+- `/health`: 常に `200 OK` を返す。DB 接続は不要。
+- `/ready`: DB 接続確認・署名鍵ロード完了確認。異常時は `503 Service Unavailable`。
+- `/metrics`: Prometheus 形式のメトリクス（認証成功/失敗率、トークン発行数等）。
+
 ---
 
 ## 3. SLO関連エンドポイント
@@ -423,13 +504,39 @@ POST   /management/v1/incidents/revoke-user-tokens       ← ユーザー全ト�
 ログイン画面（フロントエンド）がバックエンドを呼ぶ内部API。**外部には公開しない。**
 
 ```
+### 認証・セッション
 POST   /internal/login                    ← ログイン（ID/パスワード）
 POST   /internal/logout                   ← ログアウト
 GET    /internal/me                       ← 現在のセッション確認
+
+### パスワード管理
 POST   /internal/password/reset-request   ← パスワードリセットメール送信
 POST   /internal/password/reset           ← パスワードリセット実行
+POST   /internal/password/change          ← パスワード変更（ログイン済み）
+
+### MFA（TOTP）
+POST   /internal/mfa/totp/setup           ← TOTP初期設定（QRコード生成含む）
 POST   /internal/mfa/totp/verify          ← TOTP検証
-POST   /internal/mfa/totp/setup           ← TOTP初期設定
+DELETE /internal/mfa/totp                 ← TOTP無効化（パスワード再確認必須）
+
+### MFA（WebAuthn）
+POST   /internal/mfa/webauthn/register/begin     ← WebAuthn登録開始（challenge発行）
+POST   /internal/mfa/webauthn/register/complete   ← WebAuthn登録完了（attestation検証）
+POST   /internal/mfa/webauthn/authenticate/begin  ← WebAuthn認証開始（challenge発行）
+POST   /internal/mfa/webauthn/authenticate/complete ← WebAuthn認証完了（assertion検証）
+GET    /internal/mfa/webauthn/credentials         ← 登録済みデバイス一覧
+DELETE /internal/mfa/webauthn/credentials/{id}    ← デバイス削除
+
+### MFA（バックアップコード）
+POST   /internal/mfa/backup-codes/generate ← リカバリーコード生成（10個）
+
+### メールアドレス管理
+POST   /internal/email/change-request     ← メールアドレス変更リクエスト（検証メール送信）
+POST   /internal/email/verify             ← メールアドレス検証
+
+### セッション管理（ユーザー向け）
+GET    /internal/sessions                 ← アクティブセッション一覧
+DELETE /internal/sessions/{id}            ← 指定セッションの失効
 ```
 
 **設計上の原則:**
@@ -451,6 +558,9 @@ OIDC仕様外のカスタムエンドポイントを追加する際の判断基�
 | フロントエンド分離のための内部API | 実装上の都合（仕様には影響しない） |
 | Discovery以外のメタ情報取得 | OP固有の設定情報提供 |
 | セッション一覧取得（ユーザー向け） | セキュリティ機能として合理的 |
+| MFA自己管理（設定・無効化・デバイス管理） | セキュリティ機能として合理的 |
+| メールアドレス変更・検証 | 認証属性の管理はOPの責務 |
+| パスワード変更 | 認証属性の管理はOPの責務 |
 
 ### 追加してはいけないカスタム拡張
 
@@ -495,6 +605,10 @@ OIDC仕様のエラーコードに準拠する。
 | `server_error` | OPの内部エラー |
 | `invalid_client` | クライアント認証失敗 |
 | `invalid_grant` | 無効な認可コード・リフレッシュトークン |
+| `login_required` | `prompt=none` でセッションなし |
+| `consent_required` | `prompt=none` で同意未取得 |
+| `interaction_required` | `prompt=none` でユーザー操作が必要 |
+| `use_dpop_nonce` | DPoP nonce が必要（RFC 9449） |
 
 ### 管理APIのエラー
 
@@ -536,3 +650,35 @@ APIを実装する際に確認すべきセキュリティ項目。
 - [ ] `post_logout_redirect_uri`は登録済みURIと完全一致
 - [ ] Back-Channel Logout通知の失敗をログに記録（通知失敗でもユーザーをブロックしない）
 - [ ] RP-Initiated Logoutの発起元RPも含めてFront/Back-Channel通知する（仕様上の要件）
+
+### 認証エンドポイント（内部API）
+
+- [ ] ログイン失敗カウンター（N回連続失敗で一時ロック）
+- [ ] ロック中は正しいパスワードでもログイン拒否
+- [ ] IPベースのレート制限
+- [ ] セッション固定攻撃対策（ログイン成功時にセッションIDを再生成）
+- [ ] パスワードリセットトークンの有効期限（30分以内）
+- [ ] パスワード変更時のパスワード履歴チェック
+
+### セキュリティヘッダー
+
+- [ ] `Strict-Transport-Security`（HSTS）
+- [ ] `X-Content-Type-Options: nosniff`
+- [ ] `X-Frame-Options: DENY`（SLO の iframe 通知 URI は除外）
+- [ ] `Cache-Control: no-store`（トークンレスポンス）
+- [ ] `Content-Security-Policy`
+- [ ] `/internal/*` の CORS 制限（OP frontend オリジンのみ）
+
+### DPoP（実装時）
+
+- [ ] DPoP proof JWT の署名・`htm`・`htu`・`iat`・`jti` 検証
+- [ ] `jti` の一意性チェック（リプレイ攻撃防止）
+- [ ] アクセストークンの `cnf.jkt` と DPoP proof の一致検証
+
+### MFA
+
+- [ ] TOTP シークレットの暗号化保存（AES-256-GCM）
+- [ ] TOTP リプレイ攻撃防止（`last_used_step` チェック）
+- [ ] WebAuthn sign_count の単調増加検証（クローン検知）
+- [ ] MFA ステップ間のタイムアウト（5分以内）
+- [ ] バックアップコードの argon2id ハッシュ化保存
