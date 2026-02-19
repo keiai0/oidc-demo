@@ -13,6 +13,7 @@ type SignKeyRepository interface {
 	Create(ctx context.Context, key *model.SignKey) error
 	FindActive(ctx context.Context) (*model.SignKey, error)
 	FindAllActive(ctx context.Context) ([]model.SignKey, error)
+	DeactivateAllActive(ctx context.Context) error
 }
 
 type KeyProvider interface {
