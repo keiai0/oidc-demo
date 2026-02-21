@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/model"
 	"gorm.io/gorm"
@@ -57,4 +58,32 @@ func (r *SignKeyRepository) FindByKID(ctx context.Context, kid string) (*model.S
 		return nil, result.Error
 	}
 	return &key, nil
+}
+
+// FindAll は有効・無効を問わず全ての署名鍵を返す。
+func (r *SignKeyRepository) FindAll(ctx context.Context) ([]model.SignKey, error) {
+	var keys []model.SignKey
+	result := r.db.WithContext(ctx).Order("created_at DESC").Find(&keys)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return keys, nil
+}
+
+// Deactivate は鍵を無効化し、ローテーション日時を記録する。
+func (r *SignKeyRepository) Deactivate(ctx context.Context, kid string) error {
+	now := time.Now()
+	return r.db.WithContext(ctx).
+		Model(&model.SignKey{}).
+		Where("kid = ?", kid).
+		Updates(map[string]interface{}{"active": false, "rotated_at": now}).Error
+}
+
+// DeactivateAllActive は現在有効な全ての鍵を無効化する。
+func (r *SignKeyRepository) DeactivateAllActive(ctx context.Context) error {
+	now := time.Now()
+	return r.db.WithContext(ctx).
+		Model(&model.SignKey{}).
+		Where("active = true").
+		Updates(map[string]interface{}{"active": false, "rotated_at": now}).Error
 }

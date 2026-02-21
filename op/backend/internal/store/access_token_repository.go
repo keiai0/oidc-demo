@@ -53,3 +53,37 @@ func (r *AccessTokenRepository) RevokeBySessionID(ctx context.Context, sessionID
 		Where("session_id = ? AND revoked_at IS NULL", sessionID).
 		Update("revoked_at", now).Error
 }
+
+// RevokeAll は全ての有効なアクセストークンを失効させる。影響行数を返す。
+func (r *AccessTokenRepository) RevokeAll(ctx context.Context) (int64, error) {
+	now := time.Now()
+	result := r.db.WithContext(ctx).
+		Model(&model.AccessToken{}).
+		Where("revoked_at IS NULL").
+		Update("revoked_at", now)
+	return result.RowsAffected, result.Error
+}
+
+// RevokeByTenantID はテナントに属する全ての有効なアクセストークンを失効させる（セッション経由）。
+func (r *AccessTokenRepository) RevokeByTenantID(ctx context.Context, tenantID uuid.UUID) (int64, error) {
+	now := time.Now()
+	result := r.db.WithContext(ctx).
+		Model(&model.AccessToken{}).
+		Where("revoked_at IS NULL AND session_id IN (?)",
+			r.db.Model(&model.Session{}).Select("id").Where("tenant_id = ?", tenantID),
+		).
+		Update("revoked_at", now)
+	return result.RowsAffected, result.Error
+}
+
+// RevokeByUserID はユーザーに属する全ての有効なアクセストークンを失効させる（セッション経由）。
+func (r *AccessTokenRepository) RevokeByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
+	now := time.Now()
+	result := r.db.WithContext(ctx).
+		Model(&model.AccessToken{}).
+		Where("revoked_at IS NULL AND session_id IN (?)",
+			r.db.Model(&model.Session{}).Select("id").Where("user_id = ?", userID),
+		).
+		Update("revoked_at", now)
+	return result.RowsAffected, result.Error
+}

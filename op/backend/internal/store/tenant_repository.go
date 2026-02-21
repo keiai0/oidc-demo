@@ -40,3 +40,27 @@ func (r *TenantRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.T
 	}
 	return &tenant, nil
 }
+
+// List はテナントをページネーション付きで返す。
+func (r *TenantRepository) List(ctx context.Context, limit, offset int) ([]model.Tenant, int64, error) {
+	var tenants []model.Tenant
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&model.Tenant{}).Count(&count).Error; err != nil {
+		return nil, 0, err
+	}
+	result := r.db.WithContext(ctx).Order("created_at DESC").Limit(limit).Offset(offset).Find(&tenants)
+	if result.Error != nil {
+		return nil, 0, result.Error
+	}
+	return tenants, count, nil
+}
+
+// Create は新しいテナントを永続化する。
+func (r *TenantRepository) Create(ctx context.Context, tenant *model.Tenant) error {
+	return r.db.WithContext(ctx).Create(tenant).Error
+}
+
+// Update はテナントの変更を保存する。
+func (r *TenantRepository) Update(ctx context.Context, tenant *model.Tenant) error {
+	return r.db.WithContext(ctx).Save(tenant).Error
+}

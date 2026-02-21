@@ -62,3 +62,37 @@ func (r *RefreshTokenRepository) MarkReuseDetected(ctx context.Context, id uuid.
 		Where("id = ?", id).
 		Update("reuse_detected_at", now).Error
 }
+
+// RevokeAll は全ての有効なリフレッシュトークンを失効させる。影響行数を返す。
+func (r *RefreshTokenRepository) RevokeAll(ctx context.Context) (int64, error) {
+	now := time.Now()
+	result := r.db.WithContext(ctx).
+		Model(&model.RefreshToken{}).
+		Where("revoked_at IS NULL").
+		Update("revoked_at", now)
+	return result.RowsAffected, result.Error
+}
+
+// RevokeByTenantID はテナントに属する全ての有効なリフレッシュトークンを失効させる（セッション経由）。
+func (r *RefreshTokenRepository) RevokeByTenantID(ctx context.Context, tenantID uuid.UUID) (int64, error) {
+	now := time.Now()
+	result := r.db.WithContext(ctx).
+		Model(&model.RefreshToken{}).
+		Where("revoked_at IS NULL AND session_id IN (?)",
+			r.db.Model(&model.Session{}).Select("id").Where("tenant_id = ?", tenantID),
+		).
+		Update("revoked_at", now)
+	return result.RowsAffected, result.Error
+}
+
+// RevokeByUserID はユーザーに属する全ての有効なリフレッシュトークンを失効させる（セッション経由）。
+func (r *RefreshTokenRepository) RevokeByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
+	now := time.Now()
+	result := r.db.WithContext(ctx).
+		Model(&model.RefreshToken{}).
+		Where("revoked_at IS NULL AND session_id IN (?)",
+			r.db.Model(&model.Session{}).Select("id").Where("user_id = ?", userID),
+		).
+		Update("revoked_at", now)
+	return result.RowsAffected, result.Error
+}
