@@ -13,6 +13,7 @@ import (
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/crypto"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/database"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/jwt"
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/management"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/oidc"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/store"
 )
@@ -46,6 +47,9 @@ func main() {
 	refreshTokenRepo := store.NewRefreshTokenRepository(db)
 	idTokenRepo := store.NewIDTokenRepository(db)
 	signKeyRepo := store.NewSignKeyRepository(db)
+	redirectURIRepo := store.NewRedirectURIRepository(db)
+	adminUserRepo := store.NewAdminUserRepository(db)
+	adminSessionRepo := store.NewAdminSessionRepository(db)
 
 	// JWT サービス初期化
 	keySvc, err := jwt.NewKeyService(signKeyRepo, cfg.KeyEncryptionKey)
@@ -70,14 +74,14 @@ func main() {
 
 	// OIDC ハンドラ初期化
 	jwksHandler := oidc.NewJWKSHandler(keySvc)
-	discoveryHandler := oidc.NewDiscoveryHandler(cfg.IssuerBaseURL, tenantRepo)
-	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, authCodeRepo, authSvc, cfg.LoginPageURL)
+	discoveryHandler := oidc.NewDiscoveryHandler(cfg.BaseURL, tenantRepo)
+	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, authCodeRepo, authSvc, cfg.FrontendBaseURL)
 	tokenHandler := oidc.NewTokenHandler(
 		authCodeRepo, accessTokenRepo, refreshTokenRepo, idTokenRepo,
 		clientRepo, tenantRepo, tokenSvc,
 		crypto.VerifyPassword, crypto.VerifyCodeChallenge,
 		jwt.ComputeATHash, jwt.SHA256Hex,
-		cfg.IssuerBaseURL,
+		cfg.BaseURL,
 	)
 	userInfoHandler := oidc.NewUserInfoHandler(tokenSvc, userRepo, accessTokenRepo)
 	revokeHandler := oidc.NewRevokeHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, crypto.VerifyPassword, jwt.SHA256Hex)
@@ -89,8 +93,8 @@ func main() {
 
 	// CORS (OP Frontend からの呼び出しを許可)
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     []string{cfg.LoginPageURL},
-		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+		AllowOrigins:     []string{cfg.FrontendBaseURL},
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
 		AllowHeaders:     []string{echo.HeaderContentType, echo.HeaderAccept},
 		AllowCredentials: true,
 	}))
@@ -111,6 +115,47 @@ func main() {
 	// Internal API (OP Frontend 向け)
 	e.POST("/internal/login", loginHandler.Handle)
 	e.GET("/internal/me", meHandler.Handle)
+
+	// Admin auth サービス初期化
+	adminAuthSvc := management.NewAdminAuthService(adminUserRepo, adminSessionRepo, crypto.VerifyPassword)
+	adminAuthHandler := management.NewAdminAuthHandler(adminAuthSvc, adminUserRepo, cfg.IsSecure())
+
+	// Management auth エンドポイント (認証不要)
+	e.POST("/management/v1/auth/login", adminAuthHandler.HandleLogin)
+	e.GET("/management/v1/auth/me", adminAuthHandler.HandleMe)
+	e.POST("/management/v1/auth/logout", adminAuthHandler.HandleLogout)
+
+	// Management API (管理UI向け、セッション認証)
+	mgmtGroup := e.Group("/management/v1", management.NewAuthMiddleware(adminAuthSvc))
+
+	tenantMgmtHandler := management.NewTenantHandler(tenantRepo)
+	mgmtGroup.GET("/tenants", tenantMgmtHandler.HandleList)
+	mgmtGroup.POST("/tenants", tenantMgmtHandler.HandleCreate)
+	mgmtGroup.GET("/tenants/:tenant_id", tenantMgmtHandler.HandleGet)
+	mgmtGroup.PUT("/tenants/:tenant_id", tenantMgmtHandler.HandleUpdate)
+
+	clientMgmtHandler := management.NewClientHandler(clientRepo, tenantRepo, crypto.HashPassword)
+	mgmtGroup.GET("/tenants/:tenant_id/clients", clientMgmtHandler.HandleList)
+	mgmtGroup.POST("/tenants/:tenant_id/clients", clientMgmtHandler.HandleCreate)
+	mgmtGroup.GET("/clients/:id", clientMgmtHandler.HandleGet)
+	mgmtGroup.PUT("/clients/:id", clientMgmtHandler.HandleUpdate)
+	mgmtGroup.DELETE("/clients/:id", clientMgmtHandler.HandleDelete)
+	mgmtGroup.PUT("/clients/:id/secret", clientMgmtHandler.HandleRotateSecret)
+
+	redirectURIMgmtHandler := management.NewRedirectURIHandler(redirectURIRepo, clientRepo)
+	mgmtGroup.GET("/clients/:id/redirect-uris", redirectURIMgmtHandler.HandleList)
+	mgmtGroup.POST("/clients/:id/redirect-uris", redirectURIMgmtHandler.HandleCreate)
+	mgmtGroup.DELETE("/clients/:id/redirect-uris/:uri_id", redirectURIMgmtHandler.HandleDelete)
+
+	keyMgmtHandler := management.NewKeyHandler(signKeyRepo, keySvc)
+	mgmtGroup.GET("/keys", keyMgmtHandler.HandleList)
+	mgmtGroup.POST("/keys/rotate", keyMgmtHandler.HandleRotate)
+	mgmtGroup.DELETE("/keys/:kid", keyMgmtHandler.HandleDeactivate)
+
+	incidentHandler := management.NewIncidentHandler(sessionRepo, accessTokenRepo, refreshTokenRepo)
+	mgmtGroup.POST("/incidents/revoke-all-tokens", incidentHandler.HandleRevokeAll)
+	mgmtGroup.POST("/incidents/revoke-tenant-tokens", incidentHandler.HandleRevokeTenant)
+	mgmtGroup.POST("/incidents/revoke-user-tokens", incidentHandler.HandleRevokeUser)
 
 	e.Logger.Fatal(e.Start(":" + cfg.Port))
 }
