@@ -23,3 +23,6 @@ out/
 
 # Docker
 docker-compose.override.yml
+
+# OP Frontend
+tsconfig.tsbuildinfo
