@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, type FormEvent } from "react";
+import { Alert } from "@/components/ui/alert";
 
-const API_URL = process.env.NEXT_PUBLIC_OP_API_URL || "http://localhost:8080";
+const API_URL = process.env.NEXT_PUBLIC_OP_BACKEND_BASE_URL || "http://localhost:8080";
 
 export default function LoginPage() {
   const [loginId, setLoginId] = useState("");
@@ -15,7 +16,6 @@ export default function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setTenantCode(params.get("tenant_code") || "demo");
-    // 認可リクエストの全クエリパラメータを保持（ログイン後にリダイレクト）
     setRedirectAfterLogin(params.get("redirect_after_login") || "");
   }, []);
 
@@ -40,32 +40,36 @@ export default function LoginPage() {
         const data = await res.json();
         setError(
           data.error === "invalid_credentials"
-            ? "ログインIDまたはパスワードが正しくありません"
-            : "ログインに失敗しました"
+            ? "Login ID or password is incorrect"
+            : "Login failed",
         );
         return;
       }
 
-      // ログイン成功：認可エンドポイントに戻る
       if (redirectAfterLogin) {
         window.location.href = redirectAfterLogin;
       }
     } catch {
-      setError("サーバーに接続できません");
+      setError("Cannot connect to server");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>ログイン</h1>
-        {error && <div style={styles.error}>{error}</div>}
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
+        <h1 className="text-2xl font-semibold text-center text-gray-800 mb-6">
+          Login
+        </h1>
+        {error && <Alert variant="error">{error}</Alert>}
         <form onSubmit={handleSubmit}>
-          <div style={styles.field}>
-            <label htmlFor="loginId" style={styles.label}>
-              ログインID
+          <div className="mb-4">
+            <label
+              htmlFor="loginId"
+              className="block text-sm font-medium text-gray-600 mb-1"
+            >
+              Login ID
             </label>
             <input
               id="loginId"
@@ -74,12 +78,15 @@ export default function LoginPage() {
               onChange={(e) => setLoginId(e.target.value)}
               required
               autoFocus
-              style={styles.input}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <div style={styles.field}>
-            <label htmlFor="password" style={styles.label}>
-              パスワード
+          <div className="mb-4">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-600 mb-1"
+            >
+              Password
             </label>
             <input
               id="password"
@@ -87,78 +94,18 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={styles.input}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? "ログイン中..." : "ログイン"}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+          >
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
       </div>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f5f5f5",
-    fontFamily: "system-ui, sans-serif",
-  },
-  card: {
-    backgroundColor: "#fff",
-    padding: "2rem",
-    borderRadius: "8px",
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-    width: "100%",
-    maxWidth: "400px",
-  },
-  title: {
-    fontSize: "1.5rem",
-    fontWeight: 600,
-    textAlign: "center" as const,
-    marginBottom: "1.5rem",
-    color: "#333",
-  },
-  error: {
-    backgroundColor: "#fef2f2",
-    color: "#dc2626",
-    padding: "0.75rem",
-    borderRadius: "4px",
-    marginBottom: "1rem",
-    fontSize: "0.875rem",
-  },
-  field: {
-    marginBottom: "1rem",
-  },
-  label: {
-    display: "block",
-    marginBottom: "0.25rem",
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    color: "#555",
-  },
-  input: {
-    width: "100%",
-    padding: "0.5rem 0.75rem",
-    border: "1px solid #ddd",
-    borderRadius: "4px",
-    fontSize: "1rem",
-    boxSizing: "border-box" as const,
-  },
-  button: {
-    width: "100%",
-    padding: "0.75rem",
-    backgroundColor: "#2563eb",
-    color: "#fff",
-    border: "none",
-    borderRadius: "4px",
-    fontSize: "1rem",
-    fontWeight: 500,
-    cursor: "pointer",
-    marginTop: "0.5rem",
-  },
-};
