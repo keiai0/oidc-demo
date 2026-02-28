@@ -10,12 +10,14 @@ OIDC（OpenID Connect）準拠の認証基盤（OP: OpenID Provider）と動作�
 | `op/frontend/` | OP管理UI（Next.js、静的出力） |
 | `rp/` | 動作検証用RP（Next.js / Drizzle ORM） |
 
-## セットアップ
+## 環境構築
+
+### .envを作成
 ```bash
 cp .env.example .env
 ```
 
-## 起動方法
+### 起動方法
 
 Docker Compose の profiles で起動対象を切り替える。
 
@@ -30,7 +32,7 @@ docker compose --profile rp up -d
 docker compose --profile all up -d
 ```
 
-## DB管理
+### DB管理
 
 マイグレーションはサーバー起動時にも自動実行されるが、手動でも実行できる。
 
