@@ -25,7 +25,7 @@ export default function ClientsPage() {
 
   const columns = [
     {
-      header: "Name",
+      header: "名前",
       cell: (c: Client) => (
         <Link
           href={`${routes.management.clientDetail(c.id)}`}
@@ -42,7 +42,7 @@ export default function ClientsPage() {
       ),
     },
     {
-      header: "Auth Method",
+      header: "認証方式",
       cell: (c: Client) => (
         <span className="text-gray-600">{c.token_endpoint_auth_method}</span>
       ),
@@ -51,13 +51,13 @@ export default function ClientsPage() {
       header: "PKCE",
       cell: (c: Client) =>
         c.require_pkce ? (
-          <span className="text-green-600">Required</span>
+          <span className="text-green-600">必須</span>
         ) : (
-          <span className="text-gray-400">Optional</span>
+          <span className="text-gray-400">任意</span>
         ),
     },
     {
-      header: "Status",
+      header: "ステータス",
       cell: (c: Client) => (
         <Badge variant={c.status === "active" ? "active" : "inactive"}>
           {c.status}
@@ -74,15 +74,15 @@ export default function ClientsPage() {
             href={`${routes.management.tenantDetail(tenantId)}`}
             className="text-sm text-blue-600 hover:underline"
           >
-            &larr; Back to Tenant
+            &larr; テナントに戻る
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900 mt-1">Clients</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mt-1">クライアント</h1>
         </div>
         <Link
           href={`${routes.management.tenantClientNew(tenantId)}`}
           className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
         >
-          Create Client
+          クライアント作成
         </Link>
       </div>
 
@@ -96,11 +96,11 @@ export default function ClientsPage() {
             columns={columns}
             data={data?.data ?? []}
             keyExtractor={(c) => c.id}
-            emptyMessage="No clients found."
+            emptyMessage="クライアントがありません"
           />
           {data && data.total_count > 0 && (
             <p className="text-xs text-gray-400 mt-2">
-              {data.total_count} total
+              全 {data.total_count} 件
             </p>
           )}
         </>

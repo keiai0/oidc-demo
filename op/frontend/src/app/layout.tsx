@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "OP Frontend",
-  description: "OpenID Provider Management UI",
+  title: "OP 管理画面",
+  description: "OpenID Provider 管理 UI",
 };
 
 export default function RootLayout({

@@ -24,7 +24,7 @@ export default function ManagementLoginPage() {
     setError("");
 
     if (!loginId.trim() || !password) {
-      setError("Login ID and password are required");
+      setError("ログインIDとパスワードを入力してください");
       return;
     }
 
@@ -33,7 +33,7 @@ export default function ManagementLoginPage() {
       await login(loginId.trim(), password);
       window.location.href = routes.management.root;
     } catch {
-      setError("Login ID or password is incorrect");
+      setError("ログインIDまたはパスワードが正しくありません");
     } finally {
       setLoading(false);
     }
@@ -43,7 +43,7 @@ export default function ManagementLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm bg-white rounded-lg shadow p-8">
         <h1 className="text-xl font-bold text-gray-900 mb-6 text-center">
-          OP Management
+          OP 管理画面
         </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -51,7 +51,7 @@ export default function ManagementLoginPage() {
               htmlFor="loginId"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Login ID
+              ログインID
             </label>
             <input
               id="loginId"
@@ -68,7 +68,7 @@ export default function ManagementLoginPage() {
               htmlFor="password"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Password
+              パスワード
             </label>
             <input
               id="password"
@@ -84,7 +84,7 @@ export default function ManagementLoginPage() {
             disabled={loading}
             className="w-full py-2 px-4 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "ログイン中..." : "ログイン"}
           </button>
         </form>
       </div>

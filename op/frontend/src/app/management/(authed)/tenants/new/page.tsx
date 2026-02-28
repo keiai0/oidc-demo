@@ -43,7 +43,7 @@ export default function NewTenantPage() {
 
   return (
     <div className="max-w-lg">
-      <PageHeader title="Create Tenant" />
+      <PageHeader title="テナント作成" />
 
       {mutation.error && (
         <Alert variant="error">{getErrorMessage(mutation.error)}</Alert>
@@ -53,7 +53,7 @@ export default function NewTenantPage() {
         onSubmit={handleSubmit(onSubmit)}
         className="bg-white rounded-lg border border-gray-200 p-6 space-y-4"
       >
-        <FormField label="Code" error={errors.code}>
+        <FormField label="コード" error={errors.code}>
           <input
             {...register("code")}
             placeholder="my-tenant"
@@ -61,7 +61,7 @@ export default function NewTenantPage() {
           />
         </FormField>
 
-        <FormField label="Name" error={errors.name}>
+        <FormField label="名前" error={errors.name}>
           <input
             {...register("name")}
             placeholder="My Tenant"
@@ -69,7 +69,7 @@ export default function NewTenantPage() {
           />
         </FormField>
 
-        <FormField label="Session Lifetime (sec)" error={errors.session_lifetime}>
+        <FormField label="セッション有効期間 (秒)" error={errors.session_lifetime}>
           <input
             type="number"
             {...register("session_lifetime", { valueAsNumber: true })}
@@ -77,7 +77,7 @@ export default function NewTenantPage() {
           />
         </FormField>
 
-        <FormField label="Auth Code Lifetime (sec)" error={errors.auth_code_lifetime}>
+        <FormField label="認可コード有効期間 (秒)" error={errors.auth_code_lifetime}>
           <input
             type="number"
             {...register("auth_code_lifetime", { valueAsNumber: true })}
@@ -85,7 +85,7 @@ export default function NewTenantPage() {
           />
         </FormField>
 
-        <FormField label="Access Token Lifetime (sec)" error={errors.access_token_lifetime}>
+        <FormField label="アクセストークン有効期間 (秒)" error={errors.access_token_lifetime}>
           <input
             type="number"
             {...register("access_token_lifetime", { valueAsNumber: true })}
@@ -93,7 +93,7 @@ export default function NewTenantPage() {
           />
         </FormField>
 
-        <FormField label="Refresh Token Lifetime (sec)" error={errors.refresh_token_lifetime}>
+        <FormField label="リフレッシュトークン有効期間 (秒)" error={errors.refresh_token_lifetime}>
           <input
             type="number"
             {...register("refresh_token_lifetime", { valueAsNumber: true })}
@@ -101,7 +101,7 @@ export default function NewTenantPage() {
           />
         </FormField>
 
-        <FormField label="ID Token Lifetime (sec)" error={errors.id_token_lifetime}>
+        <FormField label="IDトークン有効期間 (秒)" error={errors.id_token_lifetime}>
           <input
             type="number"
             {...register("id_token_lifetime", { valueAsNumber: true })}
@@ -115,14 +115,14 @@ export default function NewTenantPage() {
             disabled={mutation.isPending}
             className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            {mutation.isPending ? "Creating..." : "Create"}
+            {mutation.isPending ? "作成中..." : "作成"}
           </button>
           <button
             type="button"
             onClick={() => history.back()}
             className="px-4 py-2 border border-gray-300 text-sm rounded text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            キャンセル
           </button>
         </div>
       </form>

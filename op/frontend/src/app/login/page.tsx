@@ -40,8 +40,8 @@ export default function LoginPage() {
         const data = await res.json();
         setError(
           data.error === "invalid_credentials"
-            ? "Login ID or password is incorrect"
-            : "Login failed",
+            ? "ログインIDまたはパスワードが正しくありません"
+            : "ログインに失敗しました",
         );
         return;
       }
@@ -50,7 +50,7 @@ export default function LoginPage() {
         window.location.href = redirectAfterLogin;
       }
     } catch {
-      setError("Cannot connect to server");
+      setError("サーバーに接続できません");
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
         <h1 className="text-2xl font-semibold text-center text-gray-800 mb-6">
-          Login
+          ログイン
         </h1>
         {error && <Alert variant="error">{error}</Alert>}
         <form onSubmit={handleSubmit}>
@@ -69,7 +69,7 @@ export default function LoginPage() {
               htmlFor="loginId"
               className="block text-sm font-medium text-gray-600 mb-1"
             >
-              Login ID
+              ログインID
             </label>
             <input
               id="loginId"
@@ -86,7 +86,7 @@ export default function LoginPage() {
               htmlFor="password"
               className="block text-sm font-medium text-gray-600 mb-1"
             >
-              Password
+              パスワード
             </label>
             <input
               id="password"
@@ -102,7 +102,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-3 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "ログイン中..." : "ログイン"}
           </button>
         </form>
       </div>

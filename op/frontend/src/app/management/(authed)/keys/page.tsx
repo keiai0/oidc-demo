@@ -25,7 +25,7 @@ export default function KeysPage() {
   const rotateMutation = useMutation({
     mutationFn: keysApi.rotate,
     onSuccess: () => {
-      setSuccess("Key rotated successfully");
+      setSuccess("署名鍵をローテーションしました");
       setError("");
       queryClient.invalidateQueries({ queryKey: queryKeys.keys.all });
     },
@@ -38,7 +38,7 @@ export default function KeysPage() {
   const deactivateMutation = useMutation({
     mutationFn: (kid: string) => keysApi.deactivate(kid),
     onSuccess: () => {
-      setSuccess("Key deactivated");
+      setSuccess("署名鍵を無効化しました");
       setError("");
       queryClient.invalidateQueries({ queryKey: queryKeys.keys.all });
     },
@@ -49,13 +49,13 @@ export default function KeysPage() {
   });
 
   const handleRotate = () => {
-    if (!confirm("Rotate signing key? The current key will be deactivated."))
+    if (!confirm("署名鍵をローテーションしますか？現在の鍵は無効化されます。"))
       return;
     rotateMutation.mutate();
   };
 
   const handleDeactivate = (kid: string) => {
-    if (!confirm(`Deactivate key ${kid}?`)) return;
+    if (!confirm(`署名鍵 ${kid} を無効化しますか？`)) return;
     deactivateMutation.mutate(kid);
   };
 
@@ -67,21 +67,21 @@ export default function KeysPage() {
       ),
     },
     {
-      header: "Algorithm",
+      header: "アルゴリズム",
       cell: (k: SignKey) => (
         <span className="text-gray-600">{k.algorithm}</span>
       ),
     },
     {
-      header: "Status",
+      header: "ステータス",
       cell: (k: SignKey) => (
         <Badge variant={k.active ? "active" : "inactive"}>
-          {k.active ? "active" : "inactive"}
+          {k.active ? "有効" : "無効"}
         </Badge>
       ),
     },
     {
-      header: "Created",
+      header: "作成日時",
       cell: (k: SignKey) => (
         <span className="text-gray-500">
           {new Date(k.created_at).toLocaleString()}
@@ -89,14 +89,14 @@ export default function KeysPage() {
       ),
     },
     {
-      header: "Actions",
+      header: "操作",
       cell: (k: SignKey) =>
         k.active ? (
           <button
             onClick={() => handleDeactivate(k.kid)}
             className="text-red-600 hover:underline text-xs"
           >
-            Deactivate
+            無効化
           </button>
         ) : null,
     },
@@ -105,13 +105,13 @@ export default function KeysPage() {
   return (
     <div>
       <PageHeader
-        title="Signing Keys"
+        title="署名鍵"
         action={
           <button
             onClick={handleRotate}
             className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
           >
-            Rotate Key
+            鍵のローテーション
           </button>
         }
       />
@@ -126,7 +126,7 @@ export default function KeysPage() {
           columns={columns}
           data={keys ?? []}
           keyExtractor={(k) => k.kid}
-          emptyMessage="No signing keys found."
+          emptyMessage="署名鍵がありません"
         />
       )}
     </div>

@@ -19,7 +19,7 @@ export class ApiRequestError extends Error {
 export function getErrorMessage(err: unknown): string {
   if (err instanceof ApiRequestError) return err.description;
   if (err instanceof Error) return err.message;
-  return "An unknown error occurred";
+  return "不明なエラーが発生しました";
 }
 
 /** Cookie 認証とエラーハンドリングを含む fetch ラッパー。 */

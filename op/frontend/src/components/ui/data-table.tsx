@@ -16,7 +16,7 @@ export function DataTable<T>({
   columns,
   data,
   keyExtractor,
-  emptyMessage = "No data found.",
+  emptyMessage = "データがありません",
 }: DataTableProps<T>) {
   if (data.length === 0) {
     return <p className="text-gray-500">{emptyMessage}</p>;

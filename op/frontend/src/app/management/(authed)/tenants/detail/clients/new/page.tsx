@@ -40,10 +40,10 @@ export default function NewClientPage() {
   if (created) {
     return (
       <div className="max-w-lg">
-        <PageHeader title="Client Created" />
+        <PageHeader title="クライアント作成完了" />
         <Alert variant="warning">
           <p className="font-medium">
-            Client Secret is shown only once. Copy it now.
+            クライアントシークレットは一度しか表示されません。今すぐコピーしてください。
           </p>
         </Alert>
         <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
@@ -69,13 +69,13 @@ export default function NewClientPage() {
             href={`${routes.management.clientDetail(created.id)}`}
             className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
           >
-            View Client
+            クライアント詳細
           </Link>
           <Link
             href={`${routes.management.tenantClients(tenantId)}`}
             className="px-4 py-2 border border-gray-300 text-sm rounded text-gray-700 hover:bg-gray-50"
           >
-            Back to List
+            一覧に戻る
           </Link>
         </div>
       </div>
@@ -88,9 +88,9 @@ export default function NewClientPage() {
         href={`${routes.management.tenantClients(tenantId)}`}
         className="text-sm text-blue-600 hover:underline"
       >
-        &larr; Back to Clients
+        &larr; クライアント一覧に戻る
       </Link>
-      <PageHeader title="Create Client" />
+      <PageHeader title="クライアント作成" />
 
       {mutation.error && (
         <Alert variant="error">{getErrorMessage(mutation.error)}</Alert>
@@ -105,7 +105,7 @@ export default function NewClientPage() {
       >
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Name
+            名前
           </label>
           <input
             value={name}
@@ -117,7 +117,7 @@ export default function NewClientPage() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Token Endpoint Auth Method
+            トークンエンドポイント認証方式
           </label>
           <select
             value={authMethod}
@@ -126,7 +126,7 @@ export default function NewClientPage() {
           >
             <option value="client_secret_basic">client_secret_basic</option>
             <option value="client_secret_post">client_secret_post</option>
-            <option value="none">none (Public Client)</option>
+            <option value="none">none (パブリッククライアント)</option>
           </select>
         </div>
 
@@ -139,18 +139,18 @@ export default function NewClientPage() {
             className="rounded border-gray-300"
           />
           <label htmlFor="require_pkce" className="text-sm text-gray-700">
-            Require PKCE
+            PKCE 必須
           </label>
         </div>
 
         <URIListField
-          label="Redirect URIs"
+          label="リダイレクト URI"
           values={redirectURIs}
           onChange={setRedirectURIs}
         />
 
         <URIListField
-          label="Post-Logout Redirect URIs"
+          label="ログアウト後リダイレクト URI"
           values={postLogoutRedirectURIs}
           onChange={setPostLogoutRedirectURIs}
           placeholder="https://example.com/logout-callback"
@@ -162,14 +162,14 @@ export default function NewClientPage() {
             disabled={mutation.isPending}
             className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            {mutation.isPending ? "Creating..." : "Create"}
+            {mutation.isPending ? "作成中..." : "作成"}
           </button>
           <button
             type="button"
             onClick={() => history.back()}
             className="px-4 py-2 border border-gray-300 text-sm rounded text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            キャンセル
           </button>
         </div>
       </form>

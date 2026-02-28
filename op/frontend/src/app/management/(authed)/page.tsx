@@ -6,7 +6,7 @@ import { tenantsApi } from "@/lib/api/tenants";
 import { queryKeys } from "@/lib/query/query-keys";
 import { routes } from "@/lib/routes";
 
-export default function DashboardPage() {
+export default function ダッシュボードPage() {
   const { data } = useQuery({
     queryKey: queryKeys.tenants.list(1, 0),
     queryFn: () => tenantsApi.list(1, 0),
@@ -14,26 +14,26 @@ export default function DashboardPage() {
 
   const cards = [
     {
-      title: "Tenants",
+      title: "テナント",
       href: routes.management.tenants,
       count: data?.total_count,
-      description: "Manage tenants",
+      description: "テナントの管理",
     },
     {
-      title: "Signing Keys",
+      title: "署名鍵",
       href: routes.management.keys,
-      description: "Manage JWT signing keys",
+      description: "JWT 署名鍵の管理",
     },
     {
-      title: "Incidents",
+      title: "インシデント",
       href: routes.management.incidents,
-      description: "Emergency token revocation",
+      description: "緊急トークン失効",
     },
   ];
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">ダッシュボード</h1>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {cards.map((card) => (
           <Link

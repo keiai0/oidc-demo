@@ -46,7 +46,7 @@ export function URIListField({
               onClick={() => removeAt(i)}
               className="px-2 text-red-500 hover:text-red-700"
             >
-              Remove
+              削除
             </button>
           )}
         </div>
@@ -56,7 +56,7 @@ export function URIListField({
         onClick={add}
         className="text-sm text-blue-600 hover:underline"
       >
-        + Add URI
+        + URI を追加
       </button>
     </div>
   );

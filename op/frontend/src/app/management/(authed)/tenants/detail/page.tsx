@@ -48,21 +48,21 @@ export default function TenantDetailPage() {
     mutationFn: (data: UpdateTenantInput) => tenantsApi.update(id, data),
     onSuccess: () => {
       setEditing(false);
-      setSuccess("Tenant updated successfully");
+      setSuccess("テナントを更新しました");
       queryClient.invalidateQueries({ queryKey: queryKeys.tenants.detail(id) });
     },
   });
 
   if (isLoading) return <Loading />;
   if (error) return <Alert variant="error">{getErrorMessage(error)}</Alert>;
-  if (!tenant) return <p className="text-gray-500">Tenant not found.</p>;
+  if (!tenant) return <p className="text-gray-500">テナントが見つかりません</p>;
 
   const lifetimeFields = [
-    ["session_lifetime", "Session Lifetime"],
-    ["auth_code_lifetime", "Auth Code Lifetime"],
-    ["access_token_lifetime", "Access Token Lifetime"],
-    ["refresh_token_lifetime", "Refresh Token Lifetime"],
-    ["id_token_lifetime", "ID Token Lifetime"],
+    ["session_lifetime", "セッション有効期間"],
+    ["auth_code_lifetime", "認可コード有効期間"],
+    ["access_token_lifetime", "アクセストークン有効期間"],
+    ["refresh_token_lifetime", "リフレッシュトークン有効期間"],
+    ["id_token_lifetime", "IDトークン有効期間"],
   ] as const;
 
   return (
@@ -75,24 +75,24 @@ export default function TenantDetailPage() {
       {success && <Alert variant="success">{success}</Alert>}
 
       <Card
-        title="Details"
+        title="詳細"
         titleAction={
           !editing ? (
             <button
               onClick={() => setEditing(true)}
               className="text-sm text-blue-600 hover:underline"
             >
-              Edit
+              編集
             </button>
           ) : undefined
         }
         className="mb-6"
       >
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <dt className="text-gray-500">Code</dt>
+          <dt className="text-gray-500">コード</dt>
           <dd className="font-mono">{tenant.code}</dd>
 
-          <dt className="text-gray-500">Name</dt>
+          <dt className="text-gray-500">名前</dt>
           <dd>
             {editing ? (
               <input
@@ -121,10 +121,10 @@ export default function TenantDetailPage() {
             </Fragment>
           ))}
 
-          <dt className="text-gray-500">Created</dt>
+          <dt className="text-gray-500">作成日時</dt>
           <dd>{new Date(tenant.created_at).toLocaleString()}</dd>
 
-          <dt className="text-gray-500">Updated</dt>
+          <dt className="text-gray-500">更新日時</dt>
           <dd>{new Date(tenant.updated_at).toLocaleString()}</dd>
         </dl>
 
@@ -134,24 +134,24 @@ export default function TenantDetailPage() {
               onClick={form.handleSubmit((data) => updateMutation.mutate(data))}
               className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
             >
-              Save
+              保存
             </button>
             <button
               onClick={() => setEditing(false)}
               className="px-4 py-2 border border-gray-300 text-sm rounded text-gray-700 hover:bg-gray-50"
             >
-              Cancel
+              キャンセル
             </button>
           </div>
         )}
       </Card>
 
-      <Card title="Clients">
+      <Card title="クライアント">
         <Link
           href={`${routes.management.tenantClients(id)}`}
           className="text-sm text-blue-600 hover:underline"
         >
-          View All
+          すべて表示
         </Link>
       </Card>
     </div>

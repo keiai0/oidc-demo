@@ -20,7 +20,7 @@ export default function TenantsPage() {
 
   const columns = [
     {
-      header: "Name",
+      header: "名前",
       cell: (t: Tenant) => (
         <Link
           href={`${routes.management.tenantDetail(t.id)}`}
@@ -31,13 +31,13 @@ export default function TenantsPage() {
       ),
     },
     {
-      header: "Code",
+      header: "コード",
       cell: (t: Tenant) => (
         <span className="text-gray-600 font-mono text-xs">{t.code}</span>
       ),
     },
     {
-      header: "Created",
+      header: "作成日",
       cell: (t: Tenant) => (
         <span className="text-gray-500">
           {new Date(t.created_at).toLocaleDateString()}
@@ -49,13 +49,13 @@ export default function TenantsPage() {
   return (
     <div>
       <PageHeader
-        title="Tenants"
+        title="テナント"
         action={
           <Link
             href={routes.management.tenantNew}
             className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
           >
-            Create Tenant
+            テナント作成
           </Link>
         }
       />
@@ -70,11 +70,11 @@ export default function TenantsPage() {
             columns={columns}
             data={data?.data ?? []}
             keyExtractor={(t) => t.id}
-            emptyMessage="No tenants found."
+            emptyMessage="テナントがありません"
           />
           {data && data.total_count > 0 && (
             <p className="text-xs text-gray-400 mt-2">
-              {data.total_count} total
+              全 {data.total_count} 件
             </p>
           )}
         </>
