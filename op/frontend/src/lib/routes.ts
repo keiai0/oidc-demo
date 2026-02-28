@@ -5,12 +5,13 @@ export const routes = {
     login: "/management/login",
     tenants: "/management/tenants",
     tenantNew: "/management/tenants/new",
-    tenantDetail: (id: string) => `/management/tenants/${id}`,
+    clients: "/management/clients",
+    tenantDetail: (id: string) => `/management/tenants/detail?id=${id}`,
     tenantClients: (tenantId: string) =>
-      `/management/tenants/${tenantId}/clients`,
+      `/management/tenants/detail/clients?tenant_id=${tenantId}`,
     tenantClientNew: (tenantId: string) =>
-      `/management/tenants/${tenantId}/clients/new`,
-    clientDetail: (id: string) => `/management/clients/${id}`,
+      `/management/tenants/detail/clients/new?tenant_id=${tenantId}`,
+    clientDetail: (id: string) => `/management/clients/detail?id=${id}`,
     keys: "/management/keys",
     incidents: "/management/incidents",
   },

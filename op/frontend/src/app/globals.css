@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+@theme {
+  --default-cursor: pointer;
+}
+
+@layer base {
+  a,
+  button,
+  select,
+  [role="button"] {
+    cursor: pointer;
+  }
+}

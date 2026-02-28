@@ -47,7 +47,9 @@ export default function LoginPage() {
       }
 
       if (redirectAfterLogin) {
-        window.location.href = redirectAfterLogin;
+        // redirect_after_login は OP Backend の相対パス（例: /demo/authorize?...）
+        // OP Frontend からのリダイレクトなので OP Backend の絶対 URL に変換する
+        window.location.href = `${API_URL}${redirectAfterLogin}`;
       }
     } catch {
       setError("サーバーに接続できません");

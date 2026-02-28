@@ -20,6 +20,11 @@ export default function ダッシュボードPage() {
       description: "テナントの管理",
     },
     {
+      title: "クライアント",
+      href: routes.management.clients,
+      description: "OAuth クライアントの管理",
+    },
+    {
       title: "署名鍵",
       href: routes.management.keys,
       description: "JWT 署名鍵の管理",
