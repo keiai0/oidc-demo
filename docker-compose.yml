@@ -79,14 +79,20 @@ services:
     environment:
       RP_DATABASE_URL: ${RP_DATABASE_URL}
       RP_OIDC_ISSUER: ${RP_OIDC_ISSUER}
+      RP_OIDC_ISSUER_INTERNAL: ${RP_OIDC_ISSUER_INTERNAL}
       RP_OIDC_CLIENT_ID: ${RP_OIDC_CLIENT_ID}
       RP_OIDC_CLIENT_SECRET: ${RP_OIDC_CLIENT_SECRET}
       RP_OIDC_REDIRECT_URI: ${RP_OIDC_REDIRECT_URI}
+      RP_OIDC_TENANT_CODE: ${RP_OIDC_TENANT_CODE}
+      RP_OIDC_POST_LOGOUT_REDIRECT_URI: ${RP_OIDC_POST_LOGOUT_REDIRECT_URI}
+      RP_SESSION_SECRET: ${RP_SESSION_SECRET}
+      RP_TOKEN_ENCRYPTION_KEY: ${RP_TOKEN_ENCRYPTION_KEY}
     ports:
-      - "${RP_PORT}:3000"
+      - "${RP_PORT}:3001"
     volumes:
       - ./rp/src:/app/src
       - ./rp/public:/app/public
+      - ./rp/drizzle:/app/drizzle
     depends_on:
       postgres:
         condition: service_healthy
