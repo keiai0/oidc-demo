@@ -11,11 +11,12 @@ import (
 )
 
 type AuthService struct {
-	tenantFinder   TenantFinder
-	userFinder     UserFinder
-	sessionStore   SessionStore
-	loginTracker   LoginAttemptTracker
-	verifyPassword PasswordVerifyFunc
+	tenantFinder    TenantFinder
+	userFinder      UserFinder
+	sessionStore    SessionStore
+	loginTracker    LoginAttemptTracker
+	verifyPassword  PasswordVerifyFunc
+	mfaConfigFinder MfaConfigFinder
 }
 
 func NewAuthService(
@@ -24,13 +25,15 @@ func NewAuthService(
 	sessionStore SessionStore,
 	loginTracker LoginAttemptTracker,
 	verifyPassword PasswordVerifyFunc,
+	mfaConfigFinder MfaConfigFinder,
 ) *AuthService {
 	return &AuthService{
-		tenantFinder:   tenantFinder,
-		userFinder:     userFinder,
-		sessionStore:   sessionStore,
-		loginTracker:   loginTracker,
-		verifyPassword: verifyPassword,
+		tenantFinder:    tenantFinder,
+		userFinder:      userFinder,
+		sessionStore:    sessionStore,
+		loginTracker:    loginTracker,
+		verifyPassword:  verifyPassword,
+		mfaConfigFinder: mfaConfigFinder,
 	}
 }
 
@@ -87,17 +90,38 @@ func (s *AuthService) Login(ctx context.Context, input *model.LoginInput) (*mode
 		}
 	}
 
+	// MFA 判定: ユーザーが MFA 設定済み、またはテナントが MFA 強制
+	mfaRequired := false
+	mfaSetupRequired := false
+	if s.mfaConfigFinder != nil {
+		mfaConfig, mfaErr := s.mfaConfigFinder.FindEnabledByUserID(ctx, user.ID)
+		if mfaErr != nil {
+			return nil, fmt.Errorf("failed to check MFA config: %w", mfaErr)
+		}
+		if mfaConfig != nil {
+			// ユーザーが MFA 設定済み → コード入力が必要
+			mfaRequired = true
+		} else if tenant.MfaRequired {
+			// テナントが MFA 強制 + ユーザー未設定 → セットアップが必要
+			mfaSetupRequired = true
+		}
+	}
+
+	pendingMFA := mfaRequired || mfaSetupRequired
+
 	// セッション作成
 	now := time.Now()
 	session := &model.Session{
-		UserID:    user.ID,
-		TenantID:  tenant.ID,
-		IPAddress: input.IPAddress,
-		UserAgent: input.UserAgent,
-		AuthTime:  now,
-		AMR:       model.StringSlice{"pwd"},
-		ACR:       "urn:mace:incommon:iap:bronze",
-		ExpiresAt: now.Add(time.Duration(tenant.SessionLifetime) * time.Second),
+		UserID:           user.ID,
+		TenantID:         tenant.ID,
+		IPAddress:        input.IPAddress,
+		UserAgent:        input.UserAgent,
+		AuthTime:         now,
+		AMR:              model.StringSlice{"pwd"},
+		ACR:              "urn:mace:incommon:iap:bronze",
+		PendingMFA:       pendingMFA,
+		MfaSetupRequired: mfaSetupRequired,
+		ExpiresAt:        now.Add(time.Duration(tenant.SessionLifetime) * time.Second),
 	}
 
 	if err := s.sessionStore.Create(ctx, session); err != nil {
@@ -108,8 +132,10 @@ func (s *AuthService) Login(ctx context.Context, input *model.LoginInput) (*mode
 	_ = s.userFinder.UpdateLastLoginAt(ctx, user.ID, now)
 
 	return &model.LoginOutput{
-		SessionID: session.ID,
-		User:      user,
+		SessionID:        session.ID,
+		User:             user,
+		MFARequired:      mfaRequired,
+		MFASetupRequired: mfaSetupRequired,
 	}, nil
 }
 

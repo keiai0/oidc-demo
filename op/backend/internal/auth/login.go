@@ -66,12 +66,20 @@ func (h *LoginHandler) Handle(c echo.Context) error {
 	}
 	c.SetCookie(cookie)
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	resp := map[string]interface{}{
 		"session_id": output.SessionID.String(),
 		"user": map[string]interface{}{
 			"id":    output.User.ID.String(),
 			"name":  output.User.Name,
 			"email": output.User.Email,
 		},
-	})
+	}
+	if output.MFARequired {
+		resp["mfa_required"] = true
+	}
+	if output.MFASetupRequired {
+		resp["mfa_setup_required"] = true
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }
