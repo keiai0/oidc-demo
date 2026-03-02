@@ -153,6 +153,20 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		}
 	}
 
+	// PendingMFA チェック: MFA 検証待ちのセッションを処理
+	if session != nil && session.PendingMFA {
+		if time.Since(session.AuthTime) > 5*time.Minute {
+			// MFA タイムアウト → ログインからやり直し
+			session = nil
+		} else if session.MfaSetupRequired {
+			// MFA 未設定 + テナント強制 → セットアップページへ
+			return h.redirectToMFASetup(c, tenantCode)
+		} else {
+			// MFA 設定済み → 検証ページへ
+			return h.redirectToMFA(c, tenantCode)
+		}
+	}
+
 	// prompt=login → 再認証を要求
 	if hasPrompt(prompts, "login") {
 		session = nil
@@ -282,6 +296,38 @@ func (h *AuthorizeHandler) redirectToLogin(c echo.Context, tenantCode string) er
 	loginURL.RawQuery = q.Encode()
 
 	return c.Redirect(http.StatusFound, loginURL.String())
+}
+
+// redirectToMFASetup は MFA セットアップページにリダイレクトする。
+// テナントが MFA を強制しているがユーザーが未設定の場合に使用する。
+func (h *AuthorizeHandler) redirectToMFASetup(c echo.Context, tenantCode string) error {
+	setupURL, err := url.Parse(h.loginPageURL + "/mfa/setup")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+	}
+
+	q := setupURL.Query()
+	q.Set("tenant_code", tenantCode)
+	q.Set("redirect_after_mfa", c.Request().URL.String())
+	setupURL.RawQuery = q.Encode()
+
+	return c.Redirect(http.StatusFound, setupURL.String())
+}
+
+// redirectToMFA は MFA 検証ページにリダイレクトする。
+// ログインリダイレクトと同じパターンで、authorize URL 全体を保存する。
+func (h *AuthorizeHandler) redirectToMFA(c echo.Context, tenantCode string) error {
+	mfaURL, err := url.Parse(h.loginPageURL + "/mfa/verify")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+	}
+
+	q := mfaURL.Query()
+	q.Set("tenant_code", tenantCode)
+	q.Set("redirect_after_mfa", c.Request().URL.String())
+	mfaURL.RawQuery = q.Encode()
+
+	return c.Redirect(http.StatusFound, mfaURL.String())
 }
 
 // redirectToConsent は同意画面にリダイレクトする。

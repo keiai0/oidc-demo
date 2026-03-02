@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"time"
@@ -67,8 +68,12 @@ func main() {
 
 	tokenSvc := jwt.NewTokenService(keySvc)
 
+	// MFA Store 初期化
+	mfaConfigRepo := store.NewMfaConfigRepository(db)
+	totpConfigRepo := store.NewTotpConfigRepository(db)
+
 	// Auth サービス初期化
-	authSvc := auth.NewAuthService(tenantRepo, userRepo, sessionRepo, userRepo, crypto.VerifyPassword)
+	authSvc := auth.NewAuthService(tenantRepo, userRepo, sessionRepo, userRepo, crypto.VerifyPassword, mfaConfigRepo)
 
 	// パスワード関連の Store/Service 初期化
 	passwordHistoryRepo := store.NewPasswordHistoryRepository(db)
@@ -83,11 +88,26 @@ func main() {
 	// Consent 関連の初期化
 	userConsentRepo := store.NewUserConsentRepository(db)
 
+	// MFA TOTP サービス初期化
+	// KeyEncryptionKey は hex 文字列なので、keySvc が既にデコード済みの鍵を持っている
+	mfaEncKey, err := hex.DecodeString(cfg.KeyEncryptionKey)
+	if err != nil {
+		log.Fatalf("failed to decode key encryption key for MFA: %v", err)
+	}
+	mfaTOTPSvc := auth.NewMFATOTPService(
+		mfaConfigRepo, mfaConfigRepo, totpConfigRepo, sessionRepo,
+		crypto.Encrypt, crypto.Decrypt,
+		mfaEncKey, "OIDC Demo",
+	)
+
 	// Auth ハンドラ初期化
 	loginHandler := auth.NewLoginHandler(authSvc, cfg.IsSecure())
 	meHandler := auth.NewMeHandler(authSvc, userRepo)
 	passwordChangeHandler := auth.NewPasswordChangeHandler(passwordSvc, authSvc, cfg.IsSecure())
 	consentHandler := auth.NewConsentHandler(authSvc, userConsentRepo)
+	mfaSetupHandler := auth.NewMFATOTPSetupHandler(mfaTOTPSvc, authSvc, userRepo)
+	mfaVerifySetupHandler := auth.NewMFATOTPVerifySetupHandler(mfaTOTPSvc, authSvc)
+	mfaVerifyHandler := auth.NewMFATOTPVerifyHandler(mfaTOTPSvc, authSvc)
 	resetRequestHandler := auth.NewPasswordResetRequestHandler(passwordResetSvc)
 	resetHandler := auth.NewPasswordResetHandler(passwordResetSvc)
 
@@ -139,6 +159,9 @@ func main() {
 	e.POST("/internal/password/reset-request", resetRequestHandler.Handle)
 	e.POST("/internal/password/reset", resetHandler.Handle)
 	e.POST("/internal/consent", consentHandler.Handle)
+	e.POST("/internal/mfa/totp/setup", mfaSetupHandler.Handle)
+	e.POST("/internal/mfa/totp/verify-setup", mfaVerifySetupHandler.Handle)
+	e.POST("/internal/mfa/totp/verify", mfaVerifyHandler.Handle)
 
 	// Admin auth サービス初期化
 	adminAuthSvc := management.NewAdminAuthService(adminUserRepo, adminSessionRepo, crypto.VerifyPassword)

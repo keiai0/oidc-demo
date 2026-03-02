@@ -62,6 +62,18 @@ func (r *SessionRepository) RevokeByTenantID(ctx context.Context, tenantID uuid.
 	return result.RowsAffected, result.Error
 }
 
+// UpdateMFACompleted は MFA 検証完了後にセッションの pending_mfa / AMR / ACR を更新する。
+func (r *SessionRepository) UpdateMFACompleted(ctx context.Context, sessionID uuid.UUID, amr model.StringSlice, acr string) error {
+	return r.db.WithContext(ctx).
+		Model(&model.Session{}).
+		Where("id = ?", sessionID).
+		Updates(map[string]interface{}{
+			"pending_mfa": false,
+			"amr":         amr,
+			"acr":         acr,
+		}).Error
+}
+
 // RevokeByUserID はユーザーに属する全ての有効なセッションを失効させる。
 func (r *SessionRepository) RevokeByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
 	now := time.Now()

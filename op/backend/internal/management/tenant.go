@@ -32,6 +32,7 @@ type createTenantRequest struct {
 	AccessTokenLifetime  *int   `json:"access_token_lifetime,omitempty"`
 	RefreshTokenLifetime *int   `json:"refresh_token_lifetime,omitempty"`
 	IDTokenLifetime      *int   `json:"id_token_lifetime,omitempty"`
+	MfaRequired          *bool  `json:"mfa_required,omitempty"`
 }
 
 type updateTenantRequest struct {
@@ -41,6 +42,7 @@ type updateTenantRequest struct {
 	AccessTokenLifetime  *int    `json:"access_token_lifetime,omitempty"`
 	RefreshTokenLifetime *int    `json:"refresh_token_lifetime,omitempty"`
 	IDTokenLifetime      *int    `json:"id_token_lifetime,omitempty"`
+	MfaRequired          *bool   `json:"mfa_required,omitempty"`
 }
 
 type tenantResponse struct {
@@ -52,6 +54,7 @@ type tenantResponse struct {
 	AccessTokenLifetime  int    `json:"access_token_lifetime"`
 	RefreshTokenLifetime int    `json:"refresh_token_lifetime"`
 	IDTokenLifetime      int    `json:"id_token_lifetime"`
+	MfaRequired          bool   `json:"mfa_required"`
 	CreatedAt            string `json:"created_at"`
 	UpdatedAt            string `json:"updated_at"`
 }
@@ -66,6 +69,7 @@ func toTenantResponse(t *model.Tenant) tenantResponse {
 		AccessTokenLifetime:  t.AccessTokenLifetime,
 		RefreshTokenLifetime: t.RefreshTokenLifetime,
 		IDTokenLifetime:      t.IDTokenLifetime,
+		MfaRequired:          t.MfaRequired,
 		CreatedAt:            t.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:            t.UpdatedAt.Format(time.RFC3339),
 	}
@@ -136,6 +140,7 @@ func (h *TenantHandler) HandleCreate(c echo.Context) error {
 		AccessTokenLifetime:  orDefault(req.AccessTokenLifetime, 3600),
 		RefreshTokenLifetime: orDefault(req.RefreshTokenLifetime, 2592000),
 		IDTokenLifetime:      orDefault(req.IDTokenLifetime, 3600),
+		MfaRequired:          req.MfaRequired != nil && *req.MfaRequired,
 	}
 
 	if err := h.tenantStore.Create(ctx, tenant); err != nil {
@@ -215,6 +220,9 @@ func (h *TenantHandler) HandleUpdate(c echo.Context) error {
 	}
 	if req.IDTokenLifetime != nil {
 		tenant.IDTokenLifetime = *req.IDTokenLifetime
+	}
+	if req.MfaRequired != nil {
+		tenant.MfaRequired = *req.MfaRequired
 	}
 
 	if err := h.tenantStore.Update(ctx, tenant); err != nil {
