@@ -14,9 +14,8 @@ INSERT INTO users (id, tenant_id, login_id, email, email_verified, name, status)
 ON CONFLICT (id) DO NOTHING;
 
 -- 開発用クライアント (demo-rp)
-INSERT INTO clients (id, tenant_id, client_id, client_secret_hash, name, grant_types, response_types, token_endpoint_auth_method, require_pkce, status) VALUES
+INSERT INTO clients (id, client_id, client_secret_hash, name, grant_types, response_types, token_endpoint_auth_method, require_pkce, status) VALUES
     ('c0000000-0000-0000-0000-000000000001',
-     'a0000000-0000-0000-0000-000000000001',
      'demo-rp',
      '$argon2id$v=19$m=65536,t=3,p=4$XLnZ4+fz/MCzO+Ax4vynLg$wb2a0Uwr1mgjZnTMCFylw7XCCgBR81ueDM+OmWcGQGM',
      'Demo RP',
@@ -26,6 +25,11 @@ INSERT INTO clients (id, tenant_id, client_id, client_secret_hash, name, grant_t
      true,
      'active')
 ON CONFLICT (id) DO NOTHING;
+
+-- テナント-クライアント紐づけ
+INSERT INTO tenant_clients (tenant_id, client_id) VALUES
+    ('a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001')
+ON CONFLICT (tenant_id, client_id) DO NOTHING;
 
 INSERT INTO redirect_uris (client_id, uri) VALUES
     ('c0000000-0000-0000-0000-000000000001', 'http://localhost:3001/api/auth/callback')

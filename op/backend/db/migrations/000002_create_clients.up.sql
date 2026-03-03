@@ -1,6 +1,5 @@
 CREATE TABLE IF NOT EXISTS clients (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id                   UUID NOT NULL REFERENCES tenants(id),
     client_id                   VARCHAR(255) NOT NULL UNIQUE,
     client_secret_hash          VARCHAR(512) NOT NULL,
     name                        VARCHAR(255) NOT NULL,
@@ -15,10 +14,7 @@ CREATE TABLE IF NOT EXISTS clients (
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_clients_tenant_id ON clients(tenant_id);
-
 COMMENT ON TABLE clients IS 'OPに登録されたOIDCクライアント（RP）。OIDC仕様の Relying Party に対応';
-COMMENT ON COLUMN clients.tenant_id IS '所属テナント';
 COMMENT ON COLUMN clients.client_id IS 'OIDC仕様の client_id';
 COMMENT ON COLUMN clients.client_secret_hash IS 'client_secret のハッシュ値';
 COMMENT ON COLUMN clients.name IS 'クライアント表示名';
