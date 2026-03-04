@@ -20,6 +20,12 @@ type ClientFinder interface {
 	FindByClientIDWithRedirectURIs(ctx context.Context, clientID string) (*model.Client, error)
 }
 
+// TenantClientChecker はテナントとクライアントの紐づきを検証する。
+type TenantClientChecker interface {
+	// ExistsByTenantAndClient はテナントでクライアントが有効かどうかを返す。
+	ExistsByTenantAndClient(ctx context.Context, tenantID, clientID uuid.UUID) (bool, error)
+}
+
 type AuthorizationCodeStore interface {
 	Create(ctx context.Context, code *model.AuthorizationCode) error
 	FindByCode(ctx context.Context, code string) (*model.AuthorizationCode, error)

@@ -23,6 +23,8 @@ type TenantStore interface {
 
 // ClientStore は管理機能向けのクライアント永続化操作を定義する。
 type ClientStore interface {
+	// List は全クライアントをページネーション付きで返す。
+	List(ctx context.Context, limit, offset int) ([]model.Client, int64, error)
 	// ListByTenantID はテナントに属するクライアントをページネーション付きで返す。
 	ListByTenantID(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]model.Client, int64, error)
 	// Create は新しいクライアントを永続化する。
@@ -37,6 +39,18 @@ type ClientStore interface {
 	UpdateSecretHash(ctx context.Context, id uuid.UUID, hash string) error
 	// SoftDelete はクライアントの status を "disabled" に設定して論理削除する。
 	SoftDelete(ctx context.Context, id uuid.UUID) error
+}
+
+// TenantClientStore はテナント-クライアント中間テーブルの管理操作を定義する。
+type TenantClientStore interface {
+	// ExistsByTenantAndClient はテナントでクライアントが有効かどうかを返す。
+	ExistsByTenantAndClient(ctx context.Context, tenantID, clientID uuid.UUID) (bool, error)
+	// Create は中間テーブルにレコードを追加する。
+	Create(ctx context.Context, tc *model.TenantClient) error
+	// Delete はテナント-クライアント紐づけを削除する。
+	Delete(ctx context.Context, tenantID, clientID uuid.UUID) error
+	// ListByClientID はクライアントに紐づくテナント-クライアント関連を返す。
+	ListByClientID(ctx context.Context, clientID uuid.UUID) ([]model.TenantClient, error)
 }
 
 // RedirectURIStore はリダイレクト URI の永続化操作を定義する。
