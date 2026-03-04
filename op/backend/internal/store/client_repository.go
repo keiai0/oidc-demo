@@ -46,19 +46,39 @@ func (r *ClientRepository) FindByClientIDWithRedirectURIs(ctx context.Context, c
 }
 
 // ListByTenantID はテナントに属するクライアントをページネーション付きで返す。
+// tenant_clients 中間テーブルを JOIN して検索する。
 func (r *ClientRepository) ListByTenantID(ctx context.Context, tenantID uuid.UUID, limit, offset int) ([]model.Client, int64, error) {
 	var clients []model.Client
 	var count int64
-	if err := r.db.WithContext(ctx).Model(&model.Client{}).Where("tenant_id = ?", tenantID).Count(&count).Error; err != nil {
+
+	baseQuery := r.db.WithContext(ctx).Model(&model.Client{}).
+		Joins("INNER JOIN tenant_clients ON tenant_clients.client_id = clients.id").
+		Where("tenant_clients.tenant_id = ? AND tenant_clients.enabled = true", tenantID)
+
+	if err := baseQuery.Count(&count).Error; err != nil {
 		return nil, 0, err
 	}
-	result := r.db.WithContext(ctx).
-		Where("tenant_id = ?", tenantID).
+	if err := baseQuery.
+		Order("clients.created_at DESC").
+		Limit(limit).Offset(offset).
+		Find(&clients).Error; err != nil {
+		return nil, 0, err
+	}
+	return clients, count, nil
+}
+
+// List は全クライアントをページネーション付きで返す。
+func (r *ClientRepository) List(ctx context.Context, limit, offset int) ([]model.Client, int64, error) {
+	var clients []model.Client
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&model.Client{}).Count(&count).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := r.db.WithContext(ctx).
 		Order("created_at DESC").
 		Limit(limit).Offset(offset).
-		Find(&clients)
-	if result.Error != nil {
-		return nil, 0, result.Error
+		Find(&clients).Error; err != nil {
+		return nil, 0, err
 	}
 	return clients, count, nil
 }
