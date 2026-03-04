@@ -30,7 +30,6 @@ func (s *StringSlice) Scan(value interface{}) error {
 
 type Client struct {
 	ID                      uuid.UUID   `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	TenantID                uuid.UUID   `gorm:"type:uuid;not null;index"`
 	ClientID                string      `gorm:"type:varchar(255);uniqueIndex;not null"`
 	ClientSecretHash        string      `gorm:"type:varchar(512);not null"`
 	Name                    string      `gorm:"type:varchar(255);not null"`
@@ -44,7 +43,6 @@ type Client struct {
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 
-	Tenant                Tenant                  `gorm:"foreignKey:TenantID"`
 	RedirectURIs          []RedirectURI           `gorm:"foreignKey:ClientDBID"`
 	PostLogoutRedirectURIs []PostLogoutRedirectURI `gorm:"foreignKey:ClientDBID"`
 }
