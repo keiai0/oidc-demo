@@ -48,6 +48,7 @@ func main() {
 	idTokenRepo := store.NewIDTokenRepository(db)
 	signKeyRepo := store.NewSignKeyRepository(db)
 	redirectURIRepo := store.NewRedirectURIRepository(db)
+	tenantClientRepo := store.NewTenantClientRepository(db)
 	adminUserRepo := store.NewAdminUserRepository(db)
 	adminSessionRepo := store.NewAdminSessionRepository(db)
 
@@ -75,7 +76,7 @@ func main() {
 	// OIDC ハンドラ初期化
 	jwksHandler := oidc.NewJWKSHandler(keySvc)
 	discoveryHandler := oidc.NewDiscoveryHandler(cfg.BaseURL, tenantRepo)
-	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, authCodeRepo, authSvc, cfg.FrontendBaseURL)
+	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, authSvc, cfg.FrontendBaseURL)
 	tokenHandler := oidc.NewTokenHandler(
 		authCodeRepo, accessTokenRepo, refreshTokenRepo, idTokenRepo,
 		clientRepo, tenantRepo, tokenSvc,
@@ -134,13 +135,17 @@ func main() {
 	mgmtGroup.GET("/tenants/:tenant_id", tenantMgmtHandler.HandleGet)
 	mgmtGroup.PUT("/tenants/:tenant_id", tenantMgmtHandler.HandleUpdate)
 
-	clientMgmtHandler := management.NewClientHandler(clientRepo, tenantRepo, crypto.HashPassword)
+	clientMgmtHandler := management.NewClientHandler(clientRepo, tenantRepo, tenantClientRepo, crypto.HashPassword)
+	mgmtGroup.GET("/clients", clientMgmtHandler.HandleListAll)
 	mgmtGroup.GET("/tenants/:tenant_id/clients", clientMgmtHandler.HandleList)
 	mgmtGroup.POST("/tenants/:tenant_id/clients", clientMgmtHandler.HandleCreate)
 	mgmtGroup.GET("/clients/:id", clientMgmtHandler.HandleGet)
 	mgmtGroup.PUT("/clients/:id", clientMgmtHandler.HandleUpdate)
 	mgmtGroup.DELETE("/clients/:id", clientMgmtHandler.HandleDelete)
 	mgmtGroup.PUT("/clients/:id/secret", clientMgmtHandler.HandleRotateSecret)
+	mgmtGroup.GET("/clients/:id/tenants", clientMgmtHandler.HandleListTenants)
+	mgmtGroup.POST("/clients/:id/tenants", clientMgmtHandler.HandleAddTenant)
+	mgmtGroup.DELETE("/clients/:id/tenants/:tenant_id", clientMgmtHandler.HandleRemoveTenant)
 
 	redirectURIMgmtHandler := management.NewRedirectURIHandler(redirectURIRepo, clientRepo)
 	mgmtGroup.GET("/clients/:id/redirect-uris", redirectURIMgmtHandler.HandleList)

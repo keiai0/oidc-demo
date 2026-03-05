@@ -30,21 +30,24 @@ var validAuthMethods = map[string]bool{
 
 // ClientHandler はクライアント管理の CRUD エンドポイントを処理する。
 type ClientHandler struct {
-	clientStore  ClientStore
-	tenantStore  TenantStore
-	hashPassword HashPasswordFunc
+	clientStore       ClientStore
+	tenantStore       TenantStore
+	tenantClientStore TenantClientStore
+	hashPassword      HashPasswordFunc
 }
 
 // NewClientHandler は ClientHandler を生成する。
 func NewClientHandler(
 	clientStore ClientStore,
 	tenantStore TenantStore,
+	tenantClientStore TenantClientStore,
 	hashPassword HashPasswordFunc,
 ) *ClientHandler {
 	return &ClientHandler{
-		clientStore:  clientStore,
-		tenantStore:  tenantStore,
-		hashPassword: hashPassword,
+		clientStore:       clientStore,
+		tenantStore:       tenantStore,
+		tenantClientStore: tenantClientStore,
+		hashPassword:      hashPassword,
 	}
 }
 
@@ -72,7 +75,6 @@ type updateClientRequest struct {
 
 type clientResponse struct {
 	ID                      string   `json:"id"`
-	TenantID                string   `json:"tenant_id"`
 	ClientID                string   `json:"client_id"`
 	Name                    string   `json:"name"`
 	GrantTypes              []string `json:"grant_types"`
@@ -94,7 +96,6 @@ type clientCreateResponse struct {
 func toClientResponse(c *model.Client) clientResponse {
 	return clientResponse{
 		ID:                      c.ID.String(),
-		TenantID:                c.TenantID.String(),
 		ClientID:                c.ClientID,
 		Name:                    c.Name,
 		GrantTypes:              []string(c.GrantTypes),
@@ -226,7 +227,6 @@ func (h *ClientHandler) HandleCreate(c echo.Context) error {
 	}
 
 	client := &model.Client{
-		TenantID:                tenantID,
 		ClientID:                clientID,
 		ClientSecretHash:        secretHash,
 		Name:                    req.Name,
@@ -249,6 +249,17 @@ func (h *ClientHandler) HandleCreate(c echo.Context) error {
 
 	if err := h.clientStore.Create(ctx, client); err != nil {
 		c.Logger().Errorf("failed to create client: %v", err)
+		return serverError(c)
+	}
+
+	// 中間テーブルにテナント-クライアント紐づけを追加
+	tc := &model.TenantClient{
+		TenantID: tenantID,
+		ClientID: client.ID,
+		Enabled:  true,
+	}
+	if err := h.tenantClientStore.Create(ctx, tc); err != nil {
+		c.Logger().Errorf("failed to create tenant-client association: %v", err)
 		return serverError(c)
 	}
 
@@ -442,6 +453,166 @@ func (h *ClientHandler) HandleRotateSecret(c echo.Context) error {
 		"client_id":     client.ClientID,
 		"client_secret": newSecret,
 	})
+}
+
+// HandleListAll は GET /management/v1/clients を処理する（全クライアント一覧）。
+func (h *ClientHandler) HandleListAll(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	p := parsePagination(c)
+	clients, total, err := h.clientStore.List(ctx, p.Limit, p.Offset)
+	if err != nil {
+		c.Logger().Errorf("failed to list all clients: %v", err)
+		return serverError(c)
+	}
+
+	data := make([]clientResponse, len(clients))
+	for i, cl := range clients {
+		data[i] = toClientResponse(&cl)
+	}
+
+	return c.JSON(http.StatusOK, ListResponse[clientResponse]{
+		Data:       data,
+		TotalCount: total,
+	})
+}
+
+type addTenantRequest struct {
+	TenantID string `json:"tenant_id"`
+}
+
+type tenantAssociationResponse struct {
+	TenantID   string `json:"tenant_id"`
+	TenantName string `json:"tenant_name"`
+	TenantCode string `json:"tenant_code"`
+	Enabled    bool   `json:"enabled"`
+	CreatedAt  string `json:"created_at"`
+}
+
+// HandleAddTenant は POST /management/v1/clients/:id/tenants を処理する。
+func (h *ClientHandler) HandleAddTenant(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	clientDBID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return badRequest(c, "invalid client id format")
+	}
+
+	client, err := h.clientStore.FindByID(ctx, clientDBID)
+	if err != nil {
+		c.Logger().Errorf("failed to find client: %v", err)
+		return serverError(c)
+	}
+	if client == nil {
+		return notFound(c, "client not found")
+	}
+
+	var req addTenantRequest
+	if err := c.Bind(&req); err != nil {
+		return badRequest(c, "invalid request body")
+	}
+
+	tenantID, err := uuid.Parse(req.TenantID)
+	if err != nil {
+		return badRequest(c, "invalid tenant_id format")
+	}
+
+	tenant, err := h.tenantStore.FindByID(ctx, tenantID)
+	if err != nil {
+		c.Logger().Errorf("failed to find tenant: %v", err)
+		return serverError(c)
+	}
+	if tenant == nil {
+		return notFound(c, "tenant not found")
+	}
+
+	// 既に紐づいているか確認
+	exists, err := h.tenantClientStore.ExistsByTenantAndClient(ctx, tenantID, clientDBID)
+	if err != nil {
+		c.Logger().Errorf("failed to check tenant-client association: %v", err)
+		return serverError(c)
+	}
+	if exists {
+		return c.JSON(http.StatusConflict, map[string]string{"error": "association already exists"})
+	}
+
+	tc := &model.TenantClient{
+		TenantID: tenantID,
+		ClientID: clientDBID,
+		Enabled:  true,
+	}
+	if err := h.tenantClientStore.Create(ctx, tc); err != nil {
+		c.Logger().Errorf("failed to create tenant-client association: %v", err)
+		return serverError(c)
+	}
+
+	return c.JSON(http.StatusCreated, tenantAssociationResponse{
+		TenantID:   tenant.ID.String(),
+		TenantName: tenant.Name,
+		TenantCode: tenant.Code,
+		Enabled:    tc.Enabled,
+		CreatedAt:  tc.CreatedAt.Format(time.RFC3339),
+	})
+}
+
+// HandleRemoveTenant は DELETE /management/v1/clients/:id/tenants/:tenant_id を処理する。
+func (h *ClientHandler) HandleRemoveTenant(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	clientDBID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return badRequest(c, "invalid client id format")
+	}
+
+	tenantID, err := uuid.Parse(c.Param("tenant_id"))
+	if err != nil {
+		return badRequest(c, "invalid tenant_id format")
+	}
+
+	if err := h.tenantClientStore.Delete(ctx, tenantID, clientDBID); err != nil {
+		c.Logger().Errorf("failed to delete tenant-client association: %v", err)
+		return notFound(c, "association not found")
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// HandleListTenants は GET /management/v1/clients/:id/tenants を処理する。
+func (h *ClientHandler) HandleListTenants(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	clientDBID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return badRequest(c, "invalid client id format")
+	}
+
+	client, err := h.clientStore.FindByID(ctx, clientDBID)
+	if err != nil {
+		c.Logger().Errorf("failed to find client: %v", err)
+		return serverError(c)
+	}
+	if client == nil {
+		return notFound(c, "client not found")
+	}
+
+	tcs, err := h.tenantClientStore.ListByClientID(ctx, clientDBID)
+	if err != nil {
+		c.Logger().Errorf("failed to list tenant-client associations: %v", err)
+		return serverError(c)
+	}
+
+	data := make([]tenantAssociationResponse, len(tcs))
+	for i, tc := range tcs {
+		data[i] = tenantAssociationResponse{
+			TenantID:   tc.TenantID.String(),
+			TenantName: tc.Tenant.Name,
+			TenantCode: tc.Tenant.Code,
+			Enabled:    tc.Enabled,
+			CreatedAt:  tc.CreatedAt.Format(time.RFC3339),
+		}
+	}
+
+	return c.JSON(http.StatusOK, data)
 }
 
 // validateRedirectURI は URI が有効でフラグメントを含まないことを検証する（RFC 6749 Section 3.1.2）。

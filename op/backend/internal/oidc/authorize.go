@@ -15,26 +15,29 @@ import (
 )
 
 type AuthorizeHandler struct {
-	tenantFinder     TenantFinder
-	clientFinder     ClientFinder
-	authCodeStore    AuthorizationCodeStore
-	sessionValidator SessionValidator
-	loginPageURL     string
+	tenantFinder        TenantFinder
+	clientFinder        ClientFinder
+	tenantClientChecker TenantClientChecker
+	authCodeStore       AuthorizationCodeStore
+	sessionValidator    SessionValidator
+	loginPageURL        string
 }
 
 func NewAuthorizeHandler(
 	tenantFinder TenantFinder,
 	clientFinder ClientFinder,
+	tenantClientChecker TenantClientChecker,
 	authCodeStore AuthorizationCodeStore,
 	sessionValidator SessionValidator,
 	loginPageURL string,
 ) *AuthorizeHandler {
 	return &AuthorizeHandler{
-		tenantFinder:     tenantFinder,
-		clientFinder:     clientFinder,
-		authCodeStore:    authCodeStore,
-		sessionValidator: sessionValidator,
-		loginPageURL:     loginPageURL,
+		tenantFinder:        tenantFinder,
+		clientFinder:        clientFinder,
+		tenantClientChecker: tenantClientChecker,
+		authCodeStore:       authCodeStore,
+		sessionValidator:    sessionValidator,
+		loginPageURL:        loginPageURL,
 	}
 }
 
@@ -82,8 +85,12 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		return errorResponseDirect(c, "invalid_request", "unknown client_id")
 	}
 
-	// テナント一致チェック
-	if client.TenantID != tenant.ID {
+	// テナント-クライアント紐づきチェック（中間テーブル参照）
+	belongs, err := h.tenantClientChecker.ExistsByTenantAndClient(ctx, tenant.ID, client.ID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+	}
+	if !belongs {
 		return errorResponseDirect(c, "invalid_request", "client does not belong to this tenant")
 	}
 
