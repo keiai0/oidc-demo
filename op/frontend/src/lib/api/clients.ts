@@ -5,10 +5,17 @@ import type {
   ListResponse,
   RedirectURI,
   RotateSecretResponse,
+  TenantAssociation,
 } from "@/types";
 import { managementFetch } from "@/lib/fetcher";
 
 export const clientsApi = {
+  listAll(limit = 50, offset = 0) {
+    return managementFetch<ListResponse<Client>>(
+      `/management/v1/clients?limit=${limit}&offset=${offset}`,
+    );
+  },
+
   listByTenant(tenantId: string, limit = 50, offset = 0) {
     return managementFetch<ListResponse<Client>>(
       `/management/v1/tenants/${tenantId}/clients?limit=${limit}&offset=${offset}`,
@@ -96,6 +103,26 @@ export const clientsApi = {
   deletePostLogoutRedirectURI(clientDbId: string, uriId: string) {
     return managementFetch<void>(
       `/management/v1/clients/${clientDbId}/post-logout-redirect-uris/${uriId}`,
+      { method: "DELETE" },
+    );
+  },
+
+  listTenants(clientDbId: string) {
+    return managementFetch<TenantAssociation[]>(
+      `/management/v1/clients/${clientDbId}/tenants`,
+    );
+  },
+
+  addTenant(clientDbId: string, tenantId: string) {
+    return managementFetch<TenantAssociation>(
+      `/management/v1/clients/${clientDbId}/tenants`,
+      { method: "POST", body: JSON.stringify({ tenant_id: tenantId }) },
+    );
+  },
+
+  removeTenant(clientDbId: string, tenantId: string) {
+    return managementFetch<void>(
+      `/management/v1/clients/${clientDbId}/tenants/${tenantId}`,
       { method: "DELETE" },
     );
   },

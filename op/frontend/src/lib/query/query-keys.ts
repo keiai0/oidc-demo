@@ -7,9 +7,12 @@ export const queryKeys = {
   },
   clients: {
     all: ["clients"] as const,
+    list: (limit?: number, offset?: number) =>
+      ["clients", "list", { limit, offset }] as const,
     listByTenant: (tenantId: string) =>
       ["clients", "list", { tenantId }] as const,
     detail: (id: string) => ["clients", "detail", id] as const,
+    tenants: (id: string) => ["clients", "tenants", id] as const,
   },
   keys: {
     all: ["keys"] as const,
