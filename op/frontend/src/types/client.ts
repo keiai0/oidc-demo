@@ -1,6 +1,13 @@
+export type TenantAssociation = {
+  tenant_id: string;
+  tenant_name: string;
+  tenant_code: string;
+  enabled: boolean;
+  created_at: string;
+};
+
 export type Client = {
   id: string;
-  tenant_id: string;
   client_id: string;
   name: string;
   grant_types: string[];

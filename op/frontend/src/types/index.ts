@@ -6,6 +6,7 @@ export type {
   ClientDetail,
   RedirectURI,
   RotateSecretResponse,
+  TenantAssociation,
 } from "./client";
 export type { SignKey } from "./key";
 export type { RevokeResponse } from "./incident";
