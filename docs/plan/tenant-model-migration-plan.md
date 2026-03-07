@@ -71,33 +71,37 @@ SELECT tenant_id, id FROM clients;
 ALTER TABLE clients DROP COLUMN tenant_id;
 ```
 
-### 3. 認可コード・トークンにテナント情報を追加
+### 3. 認可コード・トークンへの影響
 
-Client がテナントに紐づかなくなるため、認可フローのどのテナント経由でアクセスされたかをトークンに記録する必要がある。
-
-```sql
--- authorization_codes にテナント情報を追加（session 経由で取得可能だが明示化）
--- sessions.tenant_id は既に存在するため追加不要
-```
+Client がテナントに直接紐づかなくなるが、認可フローのテナント情報は **`sessions.tenant_id`** 経由で取得可能。
+既存の `sessions.tenant_id` で十分であり、追加のスキーマ変更は不要。
 
 ---
 
 ## バックエンド変更
 
-### Store 層
-
-| ファイル | 変更内容 |
-|---------|---------|
-| `store/client.go` | `ListByTenantID` → 中間テーブル JOIN に変更 |
-| `store/client.go` | `Create` から `tenant_id` を除去 |
-| `store/tenant_client.go` | 新規: 中間テーブル CRUD |
-
 ### Model 層
 
 | ファイル | 変更内容 |
 |---------|---------|
-| `model/client.go` | `TenantID` フィールドを削除 |
+| `model/client.go` | `TenantID` フィールドを削除、`Tenant` リレーション定義を削除 |
 | `model/tenant_client.go` | 新規: `TenantClient` エンティティ |
+
+### Store 層
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `store/client_repository.go` | `ListByTenantID` → 中間テーブル JOIN に変更、`Create` から `tenant_id` を除去 |
+| `store/tenant_client_repository.go` | 新規: 中間テーブル CRUD（追加・削除・存在確認） |
+
+### OIDC フロー
+
+| 処理 | 変更内容 |
+|-----|---------|
+| 認可エンドポイント (`authorize.go`) | `client.TenantID != tenant.ID` チェックを `tenant_clients` テーブルの存在確認に変更 |
+
+トークンエンドポイント (`token_authcode.go`, `token_refresh.go`) は変更不要。
+テナント情報は `authCode.Session.TenantID` 経由で取得しており、`client.TenantID` を参照していない。
 
 ### Management API
 
@@ -105,49 +109,82 @@ Client がテナントに紐づかなくなるため、認可フローのどの�
 |--------------|---------|
 | `POST /management/v1/tenants/:id/clients` | クライアント作成 + 中間テーブルへの関連追加 |
 | `GET /management/v1/tenants/:id/clients` | 中間テーブル JOIN で取得 |
-| `POST /management/v1/clients` | 新規: テナント非依存のクライアント作成 |
-| `GET /management/v1/clients` | 新規: 全クライアント一覧 |
+| `GET /management/v1/clients` | 新規: 全クライアント一覧（テナント横断） |
 | `POST /management/v1/clients/:id/tenants` | 新規: クライアントにテナントを紐づけ |
 | `DELETE /management/v1/clients/:id/tenants/:tenant_id` | 新規: クライアントからテナント紐づけを解除 |
 
-### OIDC フロー
+`management/client.go` の `clientResponse` から `tenant_id` フィールドを削除し、代わりに `tenants` フィールド（関連テナント一覧）を追加する。
 
-| 処理 | 変更内容 |
-|-----|---------|
-| 認可エンドポイント | `client_id` の検索時に `tenant_clients` を確認し、該当テナントで利用可能か検証 |
-| トークンエンドポイント | クライアント認証時のテナント検証を中間テーブル経由に変更 |
+### deps.go インターフェース
+
+| パッケージ | 変更内容 |
+|-----------|---------|
+| `oidc/deps.go` | `ClientFinder` は変更なし（`FindByClientID` はテナント非依存で問題ない） |
+| `oidc/deps.go` | `TenantClientChecker` インターフェース追加: テナントでクライアントが利用可能か確認 |
+| `management/deps.go` | `ClientStore.ListByTenantID` は維持（内部実装が JOIN に変更） |
+| `management/deps.go` | `TenantClientStore` インターフェース追加 |
 
 ---
 
 ## フロントエンド変更
 
-### ルーティング
+### 型定義
 
-| 現在 | 移行後 |
-|-----|-------|
-| テナント詳細 → クライアント一覧 | そのまま維持（テナントに紐づくクライアントを表示） |
-| — | クライアント一覧（全件）ページは既に存在 |
-| — | クライアント詳細にテナント紐づけ管理 UI を追加 |
+| ファイル | 変更内容 |
+|---------|---------|
+| `types/client.ts` | `Client` 型から `tenant_id: string` を削除、`tenants?: TenantSummary[]` を追加 |
 
 ### ページ変更
 
 | ページ | 変更内容 |
 |-------|---------|
-| クライアント一覧 (`/management/clients`) | API がテナント横断で返すようになるため、フロントエンドでの集約処理を API 呼び出しに置き換え |
-| クライアント作成 | テナント選択を必須ではなくオプションに変更（後からテナントを紐づけ可能） |
-| クライアント詳細 | 「関連テナント」セクション追加（テナントの追加・解除 UI） |
+| クライアント一覧 (`/management/clients`) | N+1 クエリ（全テナント→各テナントのクライアント取得）を `GET /management/v1/clients` 単一 API に置き換え |
+| クライアント作成 (`tenants/detail/clients/new`) | テナント経由の作成は維持（作成と同時にテナント紐づけ） |
+| クライアント詳細 (`/management/clients/detail`) | 「関連テナント」セクション追加（テナントの追加・解除 UI）、削除後のリダイレクト先をグローバルクライアント一覧に変更 |
+
+### API 層
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `lib/api/clients.ts` | `listAll()` 追加、`addTenant()` / `removeTenant()` 追加 |
+
+---
+
+## Seed データ更新
+
+```sql
+-- 移行後の seed: clients から tenant_id を除去
+INSERT INTO clients (id, client_id, client_secret_hash, name, grant_types, response_types,
+    token_endpoint_auth_method, require_pkce, status) VALUES
+    ('c0000000-0000-0000-0000-000000000001',
+     'demo-rp',
+     '$argon2id$v=19$m=65536,t=3,p=4$XLnZ4+fz/MCzO+Ax4vynLg$wb2a0Uwr1mgjZnTMCFylw7XCCgBR81ueDM+OmWcGQGM',
+     'Demo RP',
+     '["authorization_code", "refresh_token"]',
+     '["code"]',
+     'client_secret_post',
+     true,
+     'active')
+ON CONFLICT (id) DO NOTHING;
+
+-- テナント-クライアント関連
+INSERT INTO tenant_clients (tenant_id, client_id) VALUES
+    ('a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001')
+ON CONFLICT DO NOTHING;
+```
 
 ---
 
 ## マイグレーション手順
 
-1. `tenant_clients` テーブルを作成
-2. 既存の `clients.tenant_id` データを `tenant_clients` に移行
-3. バックエンド API を中間テーブル対応に更新
-4. フロントエンドを更新
-5. `clients.tenant_id` カラムを削除
+1. `tenant_clients` テーブルを作成（up マイグレーション）
+2. 既存の `clients.tenant_id` データを `tenant_clients` に移行（同一マイグレーション内）
+3. バックエンド（Model / Store / OIDC / Management API）を中間テーブル対応に更新
+4. **テスト・ビルド確認**（`go test ./...` / `go build ./...`）
+5. `clients.tenant_id` カラムを削除（別のマイグレーション）
 6. seed データを更新
-7. テスト・ビルド確認
+7. フロントエンドを更新
+8. **E2E 確認**（RP からのログインフロー全体が動作すること）
 
 ---
 
@@ -160,10 +197,14 @@ Client がテナントに紐づかなくなるため、認可フローのどの�
 
 ### 影響がない箇所
 - ユーザー管理（`users.tenant_id` は変更なし）
-- セッション管理
+- セッション管理（`sessions.tenant_id` は変更なし）
+- トークンエンドポイント（テナント情報は `Session.TenantID` 経由で取得）
 - 署名鍵管理
 - JWT 生成・検証ロジック
 - Discovery / JWKS エンドポイント
+- `auth/service.go`（ログイン処理。テナントは URL の `tenant_code` から取得）
+- `auth/me.go`（セッション情報返却。`Session.TenantID` を使用）
+- `RevokeByTenantID`（session / access_token / refresh_token。`Session.TenantID` を使用）
 
 ---
 
@@ -174,3 +215,4 @@ Client がテナントに紐づかなくなるため、認可フローのどの�
 | 既存の OIDC フローが壊れる | 移行前に E2E テスト（Phase 3 の RP）で動作を確認し、移行後に再確認 |
 | データ移行漏れ | up/down マイグレーションをペアで作成し、ロールバック可能にする |
 | 認可時のテナント特定が曖昧になる | 認可エンドポイントの URL に `tenant_code` が含まれるため、テナント特定は既存の仕組みを維持 |
+| カラム削除前にバックエンドが壊れる | マイグレーションを2段階に分割: (1) 中間テーブル追加+データ移行 → (2) カラム削除。間にテスト挟む |
