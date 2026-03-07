@@ -65,6 +65,11 @@ export default function LoginPage() {
           ログイン
         </h1>
         {error && <Alert variant="error">{error}</Alert>}
+        <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200 text-xs text-gray-500">
+          <p className="font-medium text-gray-600 mb-1">テスト用アカウント</p>
+          <p>ログインID: <code className="bg-gray-100 px-1 rounded">testuser</code></p>
+          <p>パスワード: <code className="bg-gray-100 px-1 rounded">password</code></p>
+        </div>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label

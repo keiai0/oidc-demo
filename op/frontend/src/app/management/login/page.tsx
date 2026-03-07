@@ -45,6 +45,11 @@ export default function ManagementLoginPage() {
         <h1 className="text-xl font-bold text-gray-900 mb-6 text-center">
           OP 管理画面
         </h1>
+        <div className="mb-2 p-3 bg-gray-50 rounded border border-gray-200 text-xs text-gray-500">
+          <p className="font-medium text-gray-600 mb-1">テスト用アカウント</p>
+          <p>ログインID: <code className="bg-gray-100 px-1 rounded">admin</code></p>
+          <p>パスワード: <code className="bg-gray-100 px-1 rounded">admin</code></p>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label

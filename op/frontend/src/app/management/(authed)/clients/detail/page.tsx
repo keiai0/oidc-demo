@@ -5,6 +5,7 @@ import { Fragment, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi } from "@/lib/api/clients";
+import { tenantsApi } from "@/lib/api/tenants";
 import { getErrorMessage } from "@/lib/fetcher";
 import { queryKeys } from "@/lib/query/query-keys";
 import { routes } from "@/lib/routes";
@@ -21,6 +22,7 @@ export default function ClientDetailPage() {
   const [newRedirectURI, setNewRedirectURI] = useState("");
   const [newPostLogoutURI, setNewPostLogoutURI] = useState("");
   const [newSecret, setNewSecret] = useState<string | null>(null);
+  const [selectedTenantId, setSelectedTenantId] = useState("");
 
   const { data: client, isLoading } = useQuery({
     queryKey: queryKeys.clients.detail(id),
@@ -28,8 +30,22 @@ export default function ClientDetailPage() {
     enabled: !!id,
   });
 
+  const { data: tenantAssociations } = useQuery({
+    queryKey: queryKeys.clients.tenants(id),
+    queryFn: () => clientsApi.listTenants(id),
+    enabled: !!id,
+  });
+
+  const { data: allTenants } = useQuery({
+    queryKey: queryKeys.tenants.list(250, 0),
+    queryFn: () => tenantsApi.list(250, 0),
+  });
+
   const invalidateClient = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.clients.detail(id) });
+
+  const invalidateTenants = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.clients.tenants(id) });
 
   const addRedirectURIMutation = useMutation({
     mutationFn: (uri: string) => clientsApi.addRedirectURI(id, uri),
@@ -82,9 +98,26 @@ export default function ClientDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => clientsApi.delete(id),
     onSuccess: () => {
-      window.location.href = client
-        ? routes.management.tenantClients(client.tenant_id)
-        : routes.management.tenants;
+      window.location.href = routes.management.clients;
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  const addTenantMutation = useMutation({
+    mutationFn: (tenantId: string) => clientsApi.addTenant(id, tenantId),
+    onSuccess: () => {
+      setSelectedTenantId("");
+      setError("");
+      invalidateTenants();
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  const removeTenantMutation = useMutation({
+    mutationFn: (tenantId: string) => clientsApi.removeTenant(id, tenantId),
+    onSuccess: () => {
+      setError("");
+      invalidateTenants();
     },
     onError: (err) => setError(getErrorMessage(err)),
   });
@@ -103,6 +136,12 @@ export default function ClientDetailPage() {
   if (isLoading) return <Loading />;
   if (!client) return <p className="text-gray-500">クライアントが見つかりません</p>;
 
+  const associatedTenantIds = new Set(
+    tenantAssociations?.map((ta) => ta.tenant_id) ?? [],
+  );
+  const availableTenants =
+    allTenants?.data.filter((t) => !associatedTenantIds.has(t.id)) ?? [];
+
   const infoFields = [
     ["Client ID", client.client_id],
     ["認証方式", client.token_endpoint_auth_method],
@@ -116,7 +155,7 @@ export default function ClientDetailPage() {
   return (
     <div className="max-w-2xl">
       <Link
-        href={routes.management.tenantClients(client.tenant_id)}
+        href={routes.management.clients}
         className="text-sm text-blue-600 hover:underline"
       >
         &larr; クライアント一覧に戻る
@@ -142,6 +181,63 @@ export default function ClientDetailPage() {
             </Fragment>
           ))}
         </dl>
+      </Card>
+
+      {/* Tenant Associations */}
+      <Card title="関連テナント" className="mb-4">
+        {!tenantAssociations || tenantAssociations.length === 0 ? (
+          <p className="text-sm text-gray-500 mb-3">
+            関連テナントがありません
+          </p>
+        ) : (
+          <ul className="space-y-2 mb-3">
+            {tenantAssociations.map((ta) => (
+              <li
+                key={ta.tenant_id}
+                className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded text-sm"
+              >
+                <Link
+                  href={routes.management.tenantDetail(ta.tenant_id)}
+                  className="text-blue-600 hover:underline"
+                >
+                  {ta.tenant_name}{" "}
+                  <span className="text-gray-400 text-xs">
+                    ({ta.tenant_code})
+                  </span>
+                </Link>
+                <button
+                  onClick={() => removeTenantMutation.mutate(ta.tenant_id)}
+                  className="text-red-500 hover:text-red-700 text-xs ml-2 shrink-0"
+                >
+                  解除
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {availableTenants.length > 0 && (
+          <div className="flex gap-2">
+            <select
+              value={selectedTenantId}
+              onChange={(e) => setSelectedTenantId(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">テナントを選択...</option>
+              {availableTenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.code})
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => addTenantMutation.mutate(selectedTenantId)}
+              disabled={!selectedTenantId}
+              className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              追加
+            </button>
+          </div>
+        )}
       </Card>
 
       {/* Secret Rotation */}
