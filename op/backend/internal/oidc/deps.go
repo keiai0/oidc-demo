@@ -59,6 +59,12 @@ type SessionValidator interface {
 	ValidateSession(ctx context.Context, sessionID uuid.UUID) (*model.Session, error)
 }
 
+// ConsentStore は同意記録の永続化操作を定義する。
+type ConsentStore interface {
+	// FindByUserAndClient はユーザーとクライアントの組み合わせで有効な同意記録を検索する。
+	FindByUserAndClient(ctx context.Context, userID, clientID uuid.UUID) (*model.UserConsent, error)
+}
+
 type KeySetProvider interface {
 	GetJWKSet(ctx context.Context) (jwk.Set, error)
 }

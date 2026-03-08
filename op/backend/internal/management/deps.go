@@ -117,6 +117,12 @@ type RefreshTokenRevoker interface {
 	RevokeByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
 }
 
+// UserUnlocker はユーザーのアカウントロックを解除する。
+type UserUnlocker interface {
+	// ResetFailedLogin は連続失敗回数とロック状態をリセットする。
+	ResetFailedLogin(ctx context.Context, userID uuid.UUID) error
+}
+
 // HashPasswordFunc は平文パスワードを argon2id でハッシュ化する。
 type HashPasswordFunc func(password string) (string, error)
 
