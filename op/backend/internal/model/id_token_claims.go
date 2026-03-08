@@ -9,4 +9,6 @@ type IDTokenClaims struct {
 	Nonce    *string
 	AuthTime time.Time
 	ATHash   string
+	ACR      string
+	AMR      []string
 }

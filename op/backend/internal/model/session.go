@@ -7,12 +7,15 @@ import (
 )
 
 type Session struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID    uuid.UUID  `gorm:"type:uuid;not null"`
-	TenantID  uuid.UUID  `gorm:"type:uuid;not null"`
-	IPAddress string     `gorm:"type:varchar(45);not null"`
-	UserAgent string     `gorm:"type:text;not null;default:''"`
-	ExpiresAt time.Time  `gorm:"not null"`
+	ID        uuid.UUID   `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	UserID    uuid.UUID   `gorm:"type:uuid;not null"`
+	TenantID  uuid.UUID   `gorm:"type:uuid;not null"`
+	IPAddress string      `gorm:"type:varchar(45);not null"`
+	UserAgent string      `gorm:"type:text;not null;default:''"`
+	AuthTime  time.Time   `gorm:"not null;default:now()"`
+	AMR       StringSlice `gorm:"type:jsonb;not null;default:'[\"pwd\"]'"`
+	ACR       string      `gorm:"type:varchar(255);not null;default:'urn:mace:incommon:iap:bronze'"`
+	ExpiresAt time.Time   `gorm:"not null"`
 	RevokedAt *time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
