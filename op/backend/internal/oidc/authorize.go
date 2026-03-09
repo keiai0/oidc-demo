@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ type AuthorizeHandler struct {
 	clientFinder        ClientFinder
 	tenantClientChecker TenantClientChecker
 	authCodeStore       AuthorizationCodeStore
+	consentStore        ConsentStore
 	sessionValidator    SessionValidator
 	loginPageURL        string
 }
@@ -28,6 +30,7 @@ func NewAuthorizeHandler(
 	clientFinder ClientFinder,
 	tenantClientChecker TenantClientChecker,
 	authCodeStore AuthorizationCodeStore,
+	consentStore ConsentStore,
 	sessionValidator SessionValidator,
 	loginPageURL string,
 ) *AuthorizeHandler {
@@ -36,6 +39,7 @@ func NewAuthorizeHandler(
 		clientFinder:        clientFinder,
 		tenantClientChecker: tenantClientChecker,
 		authCodeStore:       authCodeStore,
+		consentStore:        consentStore,
 		sessionValidator:    sessionValidator,
 		loginPageURL:        loginPageURL,
 	}
@@ -66,6 +70,15 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 	codeChallenge := c.QueryParam("code_challenge")
 	codeChallengeMethod := c.QueryParam("code_challenge_method")
 	prompt := c.QueryParam("prompt")
+	maxAgeStr := c.QueryParam("max_age")
+	acrValuesStr := c.QueryParam("acr_values")
+
+	// prompt パラメータ解析・検証 (OIDC Core 1.0 Section 3.1.2.1)
+	prompts := parsePrompt(prompt)
+	if hasPrompt(prompts, "none") && len(prompts) > 1 {
+		// "none" は他の値と組み合わせ不可
+		return errorResponseDirect(c, "invalid_request", "prompt=none cannot be combined with other values")
+	}
 
 	// response_type 検証 (MUST: "code" のみ)
 	if responseType != "code" {
@@ -127,31 +140,79 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 	}
 
 	// セッション確認
-	var sessionID *uuid.UUID
+	var session *model.Session
 	if cookie, err := c.Cookie("op_session"); err == nil {
 		if sid, err := uuid.Parse(cookie.Value); err == nil {
-			session, err := h.sessionValidator.ValidateSession(ctx, sid)
-			if err == nil && session != nil {
+			s, err := h.sessionValidator.ValidateSession(ctx, sid)
+			if err == nil && s != nil {
 				// テナントが一致するか確認
-				if session.TenantID == tenant.ID {
-					sessionID = &session.ID
+				if s.TenantID == tenant.ID {
+					session = s
 				}
 			}
 		}
 	}
 
-	// prompt パラメータ処理
-	if prompt == "none" && sessionID == nil {
+	// prompt=login → 再認証を要求
+	if hasPrompt(prompts, "login") {
+		session = nil
+	}
+
+	// max_age チェック (OIDC Core 1.0 Section 3.1.2.1)
+	if maxAgeStr != "" && session != nil {
+		maxAge, err := strconv.Atoi(maxAgeStr)
+		if err == nil && maxAge >= 0 {
+			if time.Since(session.AuthTime) > time.Duration(maxAge)*time.Second {
+				session = nil // 認証経過時間が max_age を超えている → 再認証
+			}
+		}
+	}
+
+	// acr_values チェック
+	if acrValuesStr != "" && session != nil {
+		requestedACRs := strings.Split(acrValuesStr, " ")
+		acrSatisfied := false
+		for _, acr := range requestedACRs {
+			if session.ACR == acr {
+				acrSatisfied = true
+				break
+			}
+		}
+		if !acrSatisfied {
+			session = nil // 要求 ACR を満たさない → 再認証
+		}
+	}
+
+	// prompt=none のチェック
+	if hasPrompt(prompts, "none") && session == nil {
 		return errorRedirect(c, redirectURI, state, "login_required", "")
 	}
 
-	if prompt == "login" {
-		sessionID = nil // 再認証を要求
+	// セッションがなければログインページにリダイレクト
+	if session == nil {
+		return h.redirectToLogin(c, tenantCode)
 	}
 
-	// セッションがなければログインページにリダイレクト
-	if sessionID == nil {
-		return h.redirectToLogin(c, tenantCode)
+	// 同意チェック (OIDC Core 1.0 Section 3.1.2.4)
+	consentRequired := false
+	if hasPrompt(prompts, "consent") {
+		// prompt=consent → 同意済みでも常に同意画面を表示
+		consentRequired = true
+	} else {
+		consent, err := h.consentStore.FindByUserAndClient(ctx, session.UserID, client.ID)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+		}
+		if consent == nil || !consent.CoversScopes(scopes) {
+			consentRequired = true
+		}
+	}
+
+	if consentRequired {
+		if hasPrompt(prompts, "none") {
+			return errorRedirect(c, redirectURI, state, "consent_required", "")
+		}
+		return h.redirectToConsent(c, tenantCode, client.ID.String(), client.Name, scope)
 	}
 
 	// 認可コード発行
@@ -175,7 +236,7 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 	}
 
 	authCode := &model.AuthorizationCode{
-		SessionID:           *sessionID,
+		SessionID:           session.ID,
 		ClientID:            client.ID,
 		Code:                code,
 		RedirectURI:         redirectURI,
@@ -221,6 +282,43 @@ func (h *AuthorizeHandler) redirectToLogin(c echo.Context, tenantCode string) er
 	loginURL.RawQuery = q.Encode()
 
 	return c.Redirect(http.StatusFound, loginURL.String())
+}
+
+// redirectToConsent は同意画面にリダイレクトする。
+// ログインリダイレクトと同じパターンで、authorize URL 全体を保存する。
+func (h *AuthorizeHandler) redirectToConsent(c echo.Context, tenantCode, clientID, clientName, scope string) error {
+	consentURL, err := url.Parse(h.loginPageURL + "/consent")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+	}
+
+	q := consentURL.Query()
+	q.Set("tenant_code", tenantCode)
+	q.Set("client_id", clientID)
+	q.Set("client_name", clientName)
+	q.Set("scope", scope)
+	q.Set("redirect_after_consent", c.Request().URL.String())
+	consentURL.RawQuery = q.Encode()
+
+	return c.Redirect(http.StatusFound, consentURL.String())
+}
+
+// parsePrompt はスペース区切りの prompt パラメータを解析する。
+func parsePrompt(prompt string) []string {
+	if prompt == "" {
+		return nil
+	}
+	return strings.Split(prompt, " ")
+}
+
+// hasPrompt は指定した prompt 値が含まれているかを返す。
+func hasPrompt(prompts []string, target string) bool {
+	for _, p := range prompts {
+		if p == target {
+			return true
+		}
+	}
+	return false
 }
 
 func isRegisteredRedirectURI(registeredURIs []model.RedirectURI, uri string) bool {

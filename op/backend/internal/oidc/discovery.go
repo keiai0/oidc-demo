@@ -48,7 +48,8 @@ func (h *DiscoveryHandler) Handle(c echo.Context) error {
 		"scopes_supported":                      []string{"openid", "profile", "email", "offline_access"},
 		"token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"},
 		"code_challenge_methods_supported":      []string{"S256"},
-		"claims_supported":                      []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "name", "email", "email_verified"},
+		"acr_values_supported":                  []string{"urn:mace:incommon:iap:bronze"},
+		"claims_supported":                      []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "acr", "amr", "name", "email", "email_verified"},
 	}
 
 	c.Response().Header().Set("Cache-Control", "public, max-age=86400")

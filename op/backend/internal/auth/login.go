@@ -48,6 +48,9 @@ func (h *LoginHandler) Handle(c echo.Context) error {
 		if errors.Is(err, ErrInvalidCredentials) {
 			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid_credentials"})
 		}
+		if errors.Is(err, ErrAccountLocked) {
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "account_locked", "error_description": "account is temporarily locked due to too many failed login attempts"})
+		}
 		c.Logger().Errorf("login error: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
 	}

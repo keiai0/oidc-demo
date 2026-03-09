@@ -132,8 +132,10 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 		Subject:  userID,
 		Audience: client.ClientID,
 		Nonce:    authCode.Nonce,
-		AuthTime: authCode.Session.CreatedAt,
+		AuthTime: authCode.Session.AuthTime,
 		ATHash:   atHash,
+		ACR:      authCode.Session.ACR,
+		AMR:      []string(authCode.Session.AMR),
 	}, idTokenLifetime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign ID token: %w", err)

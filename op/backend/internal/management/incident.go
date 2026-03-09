@@ -12,6 +12,7 @@ type IncidentHandler struct {
 	sessionRevoker      SessionRevoker
 	accessTokenRevoker  AccessTokenRevoker
 	refreshTokenRevoker RefreshTokenRevoker
+	userUnlocker        UserUnlocker
 }
 
 // NewIncidentHandler は IncidentHandler を生成する。
@@ -19,11 +20,13 @@ func NewIncidentHandler(
 	sessionRevoker SessionRevoker,
 	accessTokenRevoker AccessTokenRevoker,
 	refreshTokenRevoker RefreshTokenRevoker,
+	userUnlocker UserUnlocker,
 ) *IncidentHandler {
 	return &IncidentHandler{
 		sessionRevoker:      sessionRevoker,
 		accessTokenRevoker:  accessTokenRevoker,
 		refreshTokenRevoker: refreshTokenRevoker,
+		userUnlocker:        userUnlocker,
 	}
 }
 
@@ -107,6 +110,23 @@ func (h *IncidentHandler) HandleRevokeTenant(c echo.Context) error {
 	resp.Revoked.RefreshTokens = refreshTokens
 
 	return c.JSON(http.StatusOK, resp)
+}
+
+// HandleUnlockUser は POST /management/v1/users/:user_id/unlock を処理する。
+func (h *IncidentHandler) HandleUnlockUser(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	userID, err := uuid.Parse(c.Param("user_id"))
+	if err != nil {
+		return badRequest(c, "invalid user_id format")
+	}
+
+	if err := h.userUnlocker.ResetFailedLogin(ctx, userID); err != nil {
+		c.Logger().Errorf("failed to unlock user: %v", err)
+		return serverError(c)
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "unlocked"})
 }
 
 // HandleRevokeUser は POST /management/v1/incidents/revoke-user-tokens を処理する。
