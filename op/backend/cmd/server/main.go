@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -67,16 +68,33 @@ func main() {
 	tokenSvc := jwt.NewTokenService(keySvc)
 
 	// Auth サービス初期化
-	authSvc := auth.NewAuthService(tenantRepo, userRepo, sessionRepo, crypto.VerifyPassword)
+	authSvc := auth.NewAuthService(tenantRepo, userRepo, sessionRepo, userRepo, crypto.VerifyPassword)
+
+	// パスワード関連の Store/Service 初期化
+	passwordHistoryRepo := store.NewPasswordHistoryRepository(db)
+	passwordCredentialRepo := store.NewPasswordCredentialRepository(db)
+	passwordSvc := auth.NewPasswordService(userRepo, passwordHistoryRepo, passwordCredentialRepo, crypto.HashPassword, crypto.VerifyPassword)
+
+	// パスワードリセット関連の初期化
+	resetTokenRepo := store.NewPasswordResetTokenRepository(db)
+	emailSender := auth.NewStubEmailSender()
+	passwordResetSvc := auth.NewPasswordResetService(tenantRepo, userRepo, resetTokenRepo, passwordSvc, userRepo, emailSender)
+
+	// Consent 関連の初期化
+	userConsentRepo := store.NewUserConsentRepository(db)
 
 	// Auth ハンドラ初期化
 	loginHandler := auth.NewLoginHandler(authSvc, cfg.IsSecure())
 	meHandler := auth.NewMeHandler(authSvc, userRepo)
+	passwordChangeHandler := auth.NewPasswordChangeHandler(passwordSvc, authSvc, cfg.IsSecure())
+	consentHandler := auth.NewConsentHandler(authSvc, userConsentRepo)
+	resetRequestHandler := auth.NewPasswordResetRequestHandler(passwordResetSvc)
+	resetHandler := auth.NewPasswordResetHandler(passwordResetSvc)
 
 	// OIDC ハンドラ初期化
 	jwksHandler := oidc.NewJWKSHandler(keySvc)
 	discoveryHandler := oidc.NewDiscoveryHandler(cfg.BaseURL, tenantRepo)
-	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, authSvc, cfg.FrontendBaseURL)
+	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, userConsentRepo, authSvc, cfg.FrontendBaseURL)
 	tokenHandler := oidc.NewTokenHandler(
 		authCodeRepo, accessTokenRepo, refreshTokenRepo, idTokenRepo,
 		clientRepo, tenantRepo, tokenSvc,
@@ -114,8 +132,13 @@ func main() {
 	e.POST("/:tenant_code/revoke", revokeHandler.Handle)
 
 	// Internal API (OP Frontend 向け)
-	e.POST("/internal/login", loginHandler.Handle)
+	loginRateLimiter := auth.NewRateLimiter(10, 1*time.Minute)
+	e.POST("/internal/login", loginHandler.Handle, loginRateLimiter.Middleware())
 	e.GET("/internal/me", meHandler.Handle)
+	e.POST("/internal/password/change", passwordChangeHandler.Handle)
+	e.POST("/internal/password/reset-request", resetRequestHandler.Handle)
+	e.POST("/internal/password/reset", resetHandler.Handle)
+	e.POST("/internal/consent", consentHandler.Handle)
 
 	// Admin auth サービス初期化
 	adminAuthSvc := management.NewAdminAuthService(adminUserRepo, adminSessionRepo, crypto.VerifyPassword)
@@ -157,10 +180,11 @@ func main() {
 	mgmtGroup.POST("/keys/rotate", keyMgmtHandler.HandleRotate)
 	mgmtGroup.DELETE("/keys/:kid", keyMgmtHandler.HandleDeactivate)
 
-	incidentHandler := management.NewIncidentHandler(sessionRepo, accessTokenRepo, refreshTokenRepo)
+	incidentHandler := management.NewIncidentHandler(sessionRepo, accessTokenRepo, refreshTokenRepo, userRepo)
 	mgmtGroup.POST("/incidents/revoke-all-tokens", incidentHandler.HandleRevokeAll)
 	mgmtGroup.POST("/incidents/revoke-tenant-tokens", incidentHandler.HandleRevokeTenant)
 	mgmtGroup.POST("/incidents/revoke-user-tokens", incidentHandler.HandleRevokeUser)
+	mgmtGroup.POST("/users/:user_id/unlock", incidentHandler.HandleUnlockUser)
 
 	e.Logger.Fatal(e.Start(":" + cfg.Port))
 }
