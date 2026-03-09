@@ -49,6 +49,12 @@ func (s *TokenService) SignIDToken(ctx context.Context, claims *model.IDTokenCla
 	if claims.ATHash != "" {
 		builder = builder.Claim("at_hash", claims.ATHash)
 	}
+	if claims.ACR != "" {
+		builder = builder.Claim("acr", claims.ACR)
+	}
+	if len(claims.AMR) > 0 {
+		builder = builder.Claim("amr", claims.AMR)
+	}
 
 	token, err := builder.Build()
 	if err != nil {

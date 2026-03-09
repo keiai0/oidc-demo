@@ -14,6 +14,7 @@ type AuthService struct {
 	tenantFinder   TenantFinder
 	userFinder     UserFinder
 	sessionStore   SessionStore
+	loginTracker   LoginAttemptTracker
 	verifyPassword PasswordVerifyFunc
 }
 
@@ -21,12 +22,14 @@ func NewAuthService(
 	tenantFinder TenantFinder,
 	userFinder UserFinder,
 	sessionStore SessionStore,
+	loginTracker LoginAttemptTracker,
 	verifyPassword PasswordVerifyFunc,
 ) *AuthService {
 	return &AuthService{
 		tenantFinder:   tenantFinder,
 		userFinder:     userFinder,
 		sessionStore:   sessionStore,
+		loginTracker:   loginTracker,
 		verifyPassword: verifyPassword,
 	}
 }
@@ -54,6 +57,11 @@ func (s *AuthService) Login(ctx context.Context, input *model.LoginInput) (*mode
 		return nil, ErrInvalidCredentials
 	}
 
+	// アカウントロックチェック
+	if user.IsLocked() {
+		return nil, ErrAccountLocked
+	}
+
 	// パスワード検証
 	passwordHash := findPasswordHash(user.Credentials)
 	if passwordHash == "" {
@@ -65,16 +73,31 @@ func (s *AuthService) Login(ctx context.Context, input *model.LoginInput) (*mode
 		return nil, fmt.Errorf("failed to verify password: %w", err)
 	}
 	if !match {
+		// 失敗回数をインクリメント（エラーは無視しない）
+		if trackErr := s.loginTracker.IncrementFailedLogin(ctx, user.ID); trackErr != nil {
+			return nil, fmt.Errorf("failed to track login attempt: %w", trackErr)
+		}
 		return nil, ErrInvalidCredentials
 	}
 
+	// ログイン成功時に失敗カウンターをリセット
+	if user.FailedLoginCount > 0 {
+		if resetErr := s.loginTracker.ResetFailedLogin(ctx, user.ID); resetErr != nil {
+			return nil, fmt.Errorf("failed to reset login attempts: %w", resetErr)
+		}
+	}
+
 	// セッション作成
+	now := time.Now()
 	session := &model.Session{
 		UserID:    user.ID,
 		TenantID:  tenant.ID,
 		IPAddress: input.IPAddress,
 		UserAgent: input.UserAgent,
-		ExpiresAt: time.Now().Add(time.Duration(tenant.SessionLifetime) * time.Second),
+		AuthTime:  now,
+		AMR:       model.StringSlice{"pwd"},
+		ACR:       "urn:mace:incommon:iap:bronze",
+		ExpiresAt: now.Add(time.Duration(tenant.SessionLifetime) * time.Second),
 	}
 
 	if err := s.sessionStore.Create(ctx, session); err != nil {
@@ -82,7 +105,6 @@ func (s *AuthService) Login(ctx context.Context, input *model.LoginInput) (*mode
 	}
 
 	// last_login_at 更新
-	now := time.Now()
 	_ = s.userFinder.UpdateLastLoginAt(ctx, user.ID, now)
 
 	return &model.LoginOutput{
