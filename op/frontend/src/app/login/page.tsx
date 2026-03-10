@@ -38,11 +38,15 @@ export default function LoginPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(
-          data.error === "invalid_credentials"
-            ? "ログインIDまたはパスワードが正しくありません"
-            : "ログインに失敗しました",
-        );
+        if (data.error === "invalid_credentials") {
+          setError("ログインIDまたはパスワードが正しくありません");
+        } else if (data.error === "account_locked") {
+          setError("アカウントがロックされています。しばらく後に再試行してください。");
+        } else if (data.error === "too_many_requests") {
+          setError("リクエスト回数の上限に達しました。しばらく後に再試行してください。");
+        } else {
+          setError("ログインに失敗しました");
+        }
         return;
       }
 
@@ -112,6 +116,14 @@ export default function LoginPage() {
             {loading ? "ログイン中..." : "ログイン"}
           </button>
         </form>
+        <div className="mt-4 text-center">
+          <a
+            href={`/password-reset-request?tenant_code=${tenantCode}`}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            パスワードをお忘れですか？
+          </a>
+        </div>
       </div>
     </div>
   );
