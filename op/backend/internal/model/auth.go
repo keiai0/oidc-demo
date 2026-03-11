@@ -11,6 +11,8 @@ type LoginInput struct {
 }
 
 type LoginOutput struct {
-	SessionID uuid.UUID
-	User      *User
+	SessionID        uuid.UUID
+	User             *User
+	MFARequired      bool
+	MFASetupRequired bool
 }

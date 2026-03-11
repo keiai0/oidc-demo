@@ -15,6 +15,7 @@ type Tenant struct {
 	AccessTokenLifetime  int       `gorm:"not null;default:3600"`
 	RefreshTokenLifetime int       `gorm:"not null;default:2592000"`
 	IDTokenLifetime      int       `gorm:"not null;default:3600"`
+	MfaRequired          bool      `gorm:"not null;default:false"`
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }
