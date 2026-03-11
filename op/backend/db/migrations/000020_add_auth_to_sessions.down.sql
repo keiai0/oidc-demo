@@ -1,4 +1,0 @@
-ALTER TABLE op.sessions
-  DROP COLUMN IF EXISTS auth_time,
-  DROP COLUMN IF EXISTS amr,
-  DROP COLUMN IF EXISTS acr;

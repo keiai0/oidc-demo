@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     access_token_lifetime   INT NOT NULL DEFAULT 3600,
     refresh_token_lifetime  INT NOT NULL DEFAULT 2592000,
     id_token_lifetime       INT NOT NULL DEFAULT 3600,
+    mfa_required            BOOLEAN NOT NULL DEFAULT FALSE,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -19,3 +20,4 @@ COMMENT ON COLUMN tenants.auth_code_lifetime IS '認可コード有効期限（�
 COMMENT ON COLUMN tenants.access_token_lifetime IS 'アクセストークン有効期限（秒）';
 COMMENT ON COLUMN tenants.refresh_token_lifetime IS 'リフレッシュトークン有効期限（秒）。デフォルト30日';
 COMMENT ON COLUMN tenants.id_token_lifetime IS 'IDトークン有効期限（秒）';
+COMMENT ON COLUMN tenants.mfa_required IS 'テナント内全ユーザーに MFA を強制するか';
