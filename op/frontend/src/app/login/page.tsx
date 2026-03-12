@@ -50,10 +50,37 @@ export default function LoginPage() {
         return;
       }
 
+      const data = await res.json();
+
+      if (data.mfa_setup_required) {
+        // MFA 未設定 + テナント強制 → セットアップページへ
+        const params = new URLSearchParams();
+        params.set("tenant_code", tenantCode);
+        if (redirectAfterLogin) {
+          params.set("redirect_after_mfa", redirectAfterLogin);
+        }
+        window.location.href = `/mfa/setup?${params.toString()}`;
+        return;
+      }
+
+      if (data.mfa_required) {
+        // MFA 設定済み → 検証ページへ
+        const mfaParams = new URLSearchParams();
+        mfaParams.set("tenant_code", tenantCode);
+        if (redirectAfterLogin) {
+          mfaParams.set("redirect_after_mfa", redirectAfterLogin);
+        }
+        window.location.href = `/mfa/verify?${mfaParams.toString()}`;
+        return;
+      }
+
       if (redirectAfterLogin) {
         // redirect_after_login は OP Backend の相対パス（例: /demo/authorize?...）
         // OP Frontend からのリダイレクトなので OP Backend の絶対 URL に変換する
         window.location.href = `${API_URL}${redirectAfterLogin}`;
+      } else {
+        // redirect_after_login がない場合（直接ログイン画面にアクセスした場合）
+        window.location.href = "/";
       }
     } catch {
       setError("サーバーに接続できません");

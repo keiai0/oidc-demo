@@ -20,6 +20,7 @@ export const createTenantSchema = z.object({
   access_token_lifetime: lifetimeField,
   refresh_token_lifetime: lifetimeField,
   id_token_lifetime: lifetimeField,
+  mfa_required: z.boolean().optional(),
 });
 
 export type CreateTenantInput = z.infer<typeof createTenantSchema>;
@@ -34,6 +35,7 @@ export const updateTenantSchema = z.object({
   access_token_lifetime: z.number().int().positive(),
   refresh_token_lifetime: z.number().int().positive(),
   id_token_lifetime: z.number().int().positive(),
+  mfa_required: z.boolean(),
 });
 
 export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;

@@ -40,6 +40,7 @@ export default function TenantDetailPage() {
           access_token_lifetime: tenant.access_token_lifetime,
           refresh_token_lifetime: tenant.refresh_token_lifetime,
           id_token_lifetime: tenant.id_token_lifetime,
+          mfa_required: tenant.mfa_required,
         }
       : undefined,
   });
@@ -120,6 +121,24 @@ export default function TenantDetailPage() {
               </dd>
             </Fragment>
           ))}
+
+          <dt className="text-gray-500">MFA 必須</dt>
+          <dd>
+            {editing ? (
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  {...form.register("mfa_required")}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm">全ユーザーに2段階認証を強制する</span>
+              </label>
+            ) : (
+              <span className={tenant.mfa_required ? "text-green-600 font-medium" : "text-gray-400"}>
+                {tenant.mfa_required ? "有効" : "無効"}
+              </span>
+            )}
+          </dd>
 
           <dt className="text-gray-500">作成日時</dt>
           <dd>{new Date(tenant.created_at).toLocaleString()}</dd>

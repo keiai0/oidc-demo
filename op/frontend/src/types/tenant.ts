@@ -7,6 +7,7 @@ export type Tenant = {
   access_token_lifetime: number;
   refresh_token_lifetime: number;
   id_token_lifetime: number;
+  mfa_required: boolean;
   created_at: string;
   updated_at: string;
 };
