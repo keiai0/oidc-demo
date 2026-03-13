@@ -76,10 +76,12 @@ func (h *LoginHandler) Handle(c echo.Context) error {
 	}
 	if output.MFARequired {
 		resp["mfa_required"] = true
+		resp["mfa_methods"] = output.MFAMethods
 	}
 	if output.MFASetupRequired {
 		resp["mfa_setup_required"] = true
 	}
+	resp["passkey_registered"] = output.PasskeyRegistered
 
 	return c.JSON(http.StatusOK, resp)
 }

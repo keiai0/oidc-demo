@@ -93,15 +93,24 @@ func (s *AuthService) Login(ctx context.Context, input *model.LoginInput) (*mode
 	// MFA 判定: ユーザーが MFA 設定済み、またはテナントが MFA 強制
 	mfaRequired := false
 	mfaSetupRequired := false
+	passkeyRegistered := false
+	var mfaMethods []string
 	if s.mfaConfigFinder != nil {
-		mfaConfig, mfaErr := s.mfaConfigFinder.FindEnabledByUserID(ctx, user.ID)
+		mfaConfigs, mfaErr := s.mfaConfigFinder.FindAllEnabledByUserID(ctx, user.ID)
 		if mfaErr != nil {
 			return nil, fmt.Errorf("failed to check MFA config: %w", mfaErr)
 		}
-		if mfaConfig != nil {
-			// ユーザーが MFA 設定済み → コード入力が必要
-			mfaRequired = true
-		} else if tenant.MfaRequired {
+		for _, mc := range mfaConfigs {
+			if mc.Type == "webauthn" {
+				// パスキーは MFA ではなくパスワードレス認証なので MFA 判定に含めない
+				passkeyRegistered = true
+			} else {
+				// TOTP 等は MFA として扱う
+				mfaRequired = true
+				mfaMethods = append(mfaMethods, mc.Type)
+			}
+		}
+		if !mfaRequired && tenant.MfaRequired {
 			// テナントが MFA 強制 + ユーザー未設定 → セットアップが必要
 			mfaSetupRequired = true
 		}
@@ -136,6 +145,8 @@ func (s *AuthService) Login(ctx context.Context, input *model.LoginInput) (*mode
 		User:             user,
 		MFARequired:      mfaRequired,
 		MFASetupRequired: mfaSetupRequired,
+		MFAMethods:        mfaMethods,
+		PasskeyRegistered: passkeyRegistered,
 	}, nil
 }
 
