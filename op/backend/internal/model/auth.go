@@ -15,4 +15,6 @@ type LoginOutput struct {
 	User             *User
 	MFARequired      bool
 	MFASetupRequired bool
+	MFAMethods        []string
+	PasskeyRegistered bool
 }

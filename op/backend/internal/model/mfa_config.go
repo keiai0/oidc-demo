@@ -17,7 +17,8 @@ type MfaConfig struct {
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 
-	TotpConfig *TotpConfig `gorm:"foreignKey:MfaConfigID"`
+	TotpConfig          *TotpConfig          `gorm:"foreignKey:MfaConfigID"`
+	WebAuthnCredentials []WebAuthnCredential `gorm:"foreignKey:MfaConfigID"`
 }
 
 func (MfaConfig) TableName() string { return "mfa_configs" }

@@ -16,8 +16,9 @@ type Session struct {
 	AMR       StringSlice `gorm:"type:jsonb;not null;default:'[\"pwd\"]'"`
 	ACR       string      `gorm:"type:varchar(255);not null;default:'urn:mace:incommon:iap:bronze'"`
 	PendingMFA       bool        `gorm:"not null;default:false"`
-	MfaSetupRequired bool        `gorm:"not null;default:false"`
-	ExpiresAt        time.Time   `gorm:"not null"`
+	MfaSetupRequired  bool        `gorm:"not null;default:false"`
+	WebAuthnChallenge *string     `gorm:"column:webauthn_challenge;type:text"`
+	ExpiresAt         time.Time   `gorm:"not null"`
 	RevokedAt  *time.Time
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
