@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     acr                 VARCHAR(255) NOT NULL DEFAULT 'urn:mace:incommon:iap:bronze',
     pending_mfa         BOOLEAN NOT NULL DEFAULT FALSE,
     mfa_setup_required  BOOLEAN NOT NULL DEFAULT FALSE,
+    webauthn_challenge   TEXT,
     expires_at          TIMESTAMPTZ NOT NULL,
     revoked_at          TIMESTAMPTZ,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -26,5 +27,6 @@ COMMENT ON COLUMN sessions.amr IS '認証方法の参照（JSON配列: ["pwd"], 
 COMMENT ON COLUMN sessions.acr IS '認証コンテキストクラス参照';
 COMMENT ON COLUMN sessions.pending_mfa IS 'MFA検証待ちフラグ（trueの場合、パスワード認証は完了しているがMFA未完了）';
 COMMENT ON COLUMN sessions.mfa_setup_required IS 'MFA セットアップが必要か（テナント強制 + MFA 未設定時に true）';
+COMMENT ON COLUMN sessions.webauthn_challenge IS 'WebAuthn チャレンジデータ（JSON）。登録・認証フローの begin〜complete 間で一時保存';
 COMMENT ON COLUMN sessions.expires_at IS 'セッション有効期限';
 COMMENT ON COLUMN sessions.revoked_at IS '失効日時。SLO・強制ログアウト時に設定';
