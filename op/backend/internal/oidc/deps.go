@@ -79,6 +79,33 @@ type TokenValidator interface {
 	ValidateAccessToken(ctx context.Context, tokenString string) (*model.AccessTokenResult, error)
 }
 
+// IDTokenHintValidator は id_token_hint の署名検証と claims 抽出を行う。
+type IDTokenHintValidator interface {
+	// ValidateIDTokenHint は署名を検証し、exp はスキップする（期限切れの ID トークンが渡される場合がある）。
+	ValidateIDTokenHint(ctx context.Context, tokenString string) (*model.IDTokenHintResult, error)
+}
+
+// LogoutTokenSigner は Back-Channel Logout 用の logout_token を署名する。
+type LogoutTokenSigner interface {
+	SignLogoutToken(ctx context.Context, claims *model.LogoutTokenClaims) (string, error)
+}
+
+// SessionRevoker はセッションの検索と失効操作を定義する。
+type SessionRevoker interface {
+	FindByID(ctx context.Context, id uuid.UUID) (*model.Session, error)
+	Revoke(ctx context.Context, id uuid.UUID) error
+}
+
+// ClientsByTenantLister はテナントに属する SLO 対象クライアントの一覧取得を定義する。
+type ClientsByTenantLister interface {
+	ListByTenantIDWithLogoutURIs(ctx context.Context, tenantID uuid.UUID) ([]model.Client, error)
+}
+
+// PostLogoutRedirectURILister はクライアントの post_logout_redirect_uri 一覧取得を定義する。
+type PostLogoutRedirectURILister interface {
+	ListByClientID(ctx context.Context, clientDBID uuid.UUID) ([]model.PostLogoutRedirectURI, error)
+}
+
 type (
 	VerifyPasswordFunc      func(password, hash string) (bool, error)
 	VerifyCodeChallengeFunc func(verifier, challenge string) bool

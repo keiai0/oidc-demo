@@ -55,6 +55,9 @@ func (s *TokenService) SignIDToken(ctx context.Context, claims *model.IDTokenCla
 	if len(claims.AMR) > 0 {
 		builder = builder.Claim("amr", claims.AMR)
 	}
+	if claims.SessionID != "" {
+		builder = builder.Claim("sid", claims.SessionID)
+	}
 
 	token, err := builder.Build()
 	if err != nil {
@@ -173,4 +176,84 @@ func ComputeATHash(accessToken string) string {
 func SHA256Hex(s string) string {
 	hash := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(hash[:])
+}
+
+// SignLogoutToken は Back-Channel Logout 用の logout_token を生成・署名する。
+// 仕様参照: OIDC Back-Channel Logout 1.0 Section 2.4
+func (s *TokenService) SignLogoutToken(ctx context.Context, claims *model.LogoutTokenClaims) (string, error) {
+	kid, privKey, err := s.keySvc.GetActiveSigningKey(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get signing key: %w", err)
+	}
+
+	now := time.Now()
+	jti := uuid.New().String()
+
+	// events クレーム: REQUIRED (OIDC Back-Channel Logout 1.0 Section 2.4)
+	events := map[string]interface{}{
+		"http://schemas.openid.net/event/backchannel-logout": map[string]interface{}{},
+	}
+
+	builder := jwt.NewBuilder().
+		Issuer(claims.Issuer).
+		Subject(claims.Subject).
+		Audience([]string{claims.Audience}).
+		IssuedAt(now).
+		Expiration(now.Add(120 * time.Second)).
+		JwtID(jti).
+		Claim("events", events).
+		Claim("sid", claims.SessionID)
+	// nonce は MUST NOT (OIDC Back-Channel Logout 1.0 Section 2.4)
+
+	token, err := builder.Build()
+	if err != nil {
+		return "", fmt.Errorf("failed to build logout token: %w", err)
+	}
+
+	// typ: "logout+jwt" ヘッダー (推奨: OIDC Back-Channel Logout 1.0 Section 2.4)
+	hdrs := jws.NewHeaders()
+	_ = hdrs.Set(jws.KeyIDKey, kid)
+	_ = hdrs.Set("typ", "logout+jwt")
+
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.RS256(), privKey, jws.WithProtectedHeaders(hdrs)))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign logout token: %w", err)
+	}
+
+	return string(signed), nil
+}
+
+// ValidateIDTokenHint は id_token_hint の署名を検証し、クレームを返す。
+// exp は検証しない（RP-Initiated Logout では期限切れの ID トークンが渡される場合がある）。
+// 仕様参照: RP-Initiated Logout 1.0 Section 2
+func (s *TokenService) ValidateIDTokenHint(ctx context.Context, tokenString string) (*model.IDTokenHintResult, error) {
+	jwkSet, err := s.keySvc.GetJWKSet(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get JWK set: %w", err)
+	}
+
+	// 署名検証のみ行い、exp 等の temporal validation はスキップ
+	token, err := jwt.Parse([]byte(tokenString), jwt.WithKeySet(jwkSet), jwt.WithValidate(false))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse/verify id_token_hint: %w", err)
+	}
+
+	iss, _ := token.Issuer()
+	sub, _ := token.Subject()
+
+	aud, _ := token.Audience()
+	audience := ""
+	if len(aud) > 0 {
+		audience = aud[0]
+	}
+
+	var sid string
+	_ = token.Get("sid", &sid)
+
+	return &model.IDTokenHintResult{
+		Issuer:    iss,
+		Subject:   sub,
+		Audience:  audience,
+		SessionID: sid,
+	}, nil
 }

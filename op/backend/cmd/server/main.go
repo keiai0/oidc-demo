@@ -54,6 +54,7 @@ func main() {
 	signKeyRepo := store.NewSignKeyRepository(db)
 	redirectURIRepo := store.NewRedirectURIRepository(db)
 	tenantClientRepo := store.NewTenantClientRepository(db)
+	postLogoutRedirectURIRepo := store.NewPostLogoutRedirectURIRepository(db)
 	adminUserRepo := store.NewAdminUserRepository(db)
 	adminSessionRepo := store.NewAdminSessionRepository(db)
 
@@ -166,6 +167,20 @@ func main() {
 	userInfoHandler := oidc.NewUserInfoHandler(tokenSvc, userRepo, accessTokenRepo)
 	revokeHandler := oidc.NewRevokeHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, crypto.VerifyPassword, jwt.SHA256Hex)
 
+	// SLO (Single Logout) ハンドラ初期化
+	backChannelClient := &http.Client{Timeout: 10 * time.Second}
+	logoutHandler := oidc.NewLogoutHandler(
+		tenantRepo, clientRepo, tenantClientRepo,
+		clientRepo, postLogoutRedirectURIRepo,
+		tokenSvc, tokenSvc,
+		sessionRepo, accessTokenRepo, refreshTokenRepo,
+		cfg.BaseURL, cfg.FrontendBaseURL,
+		backChannelClient, cfg.IsSecure(),
+	)
+	internalLogoutHandler := auth.NewInternalLogoutHandler(
+		sessionRepo, accessTokenRepo, refreshTokenRepo, cfg.IsSecure(),
+	)
+
 	e := echo.New()
 
 	e.Use(middleware.Logger())
@@ -191,10 +206,13 @@ func main() {
 	e.POST("/:tenant_code/token", tokenHandler.Handle)
 	e.GET("/:tenant_code/userinfo", userInfoHandler.Handle)
 	e.POST("/:tenant_code/revoke", revokeHandler.Handle)
+	e.GET("/:tenant_code/logout", logoutHandler.Handle)
+	e.POST("/:tenant_code/logout", logoutHandler.Handle)
 
 	// Internal API (OP Frontend 向け)
 	loginRateLimiter := auth.NewRateLimiter(10, 1*time.Minute)
 	e.POST("/internal/login", loginHandler.Handle, loginRateLimiter.Middleware())
+	e.POST("/internal/logout", internalLogoutHandler.Handle)
 	e.GET("/internal/me", meHandler.Handle)
 	e.POST("/internal/password/change", passwordChangeHandler.Handle)
 	e.POST("/internal/password/reset-request", resetRequestHandler.Handle)

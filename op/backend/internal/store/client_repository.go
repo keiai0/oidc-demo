@@ -130,6 +130,23 @@ func (r *ClientRepository) UpdateSecretHash(ctx context.Context, id uuid.UUID, h
 		Update("client_secret_hash", hash).Error
 }
 
+// ListByTenantIDWithLogoutURIs はテナントに属するクライアントのうち、
+// frontchannel_logout_uri または backchannel_logout_uri が設定されているものを返す。
+// SLO 通知先の特定に使用する。
+func (r *ClientRepository) ListByTenantIDWithLogoutURIs(ctx context.Context, tenantID uuid.UUID) ([]model.Client, error) {
+	var clients []model.Client
+	err := r.db.WithContext(ctx).
+		Joins("INNER JOIN tenant_clients ON tenant_clients.client_id = clients.id").
+		Where("tenant_clients.tenant_id = ? AND tenant_clients.enabled = true", tenantID).
+		Where("clients.status = ?", "active").
+		Where("clients.frontchannel_logout_uri IS NOT NULL OR clients.backchannel_logout_uri IS NOT NULL").
+		Find(&clients).Error
+	if err != nil {
+		return nil, err
+	}
+	return clients, nil
+}
+
 // SoftDelete はクライアントの status を "disabled" に設定して論理削除する。
 func (r *ClientRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).

@@ -128,14 +128,15 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 	atHash := h.computeATHash(accessTokenStr)
 	idTokenLifetime := time.Duration(tenant.IDTokenLifetime) * time.Second
 	idTokenJTI, idTokenStr, err := h.tokenSigner.SignIDToken(ctx, &model.IDTokenClaims{
-		Issuer:   issuer,
-		Subject:  userID,
-		Audience: client.ClientID,
-		Nonce:    authCode.Nonce,
-		AuthTime: authCode.Session.AuthTime,
-		ATHash:   atHash,
-		ACR:      authCode.Session.ACR,
-		AMR:      []string(authCode.Session.AMR),
+		Issuer:    issuer,
+		Subject:   userID,
+		Audience:  client.ClientID,
+		Nonce:     authCode.Nonce,
+		AuthTime:  authCode.Session.AuthTime,
+		ATHash:    atHash,
+		ACR:       authCode.Session.ACR,
+		AMR:       []string(authCode.Session.AMR),
+		SessionID: authCode.SessionID.String(),
 	}, idTokenLifetime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign ID token: %w", err)
