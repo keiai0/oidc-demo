@@ -74,6 +74,14 @@ func (r *SessionRepository) UpdateMFACompleted(ctx context.Context, sessionID uu
 		}).Error
 }
 
+// UpdateWebAuthnChallenge は WebAuthn チャレンジデータをセッションに保存する。
+func (r *SessionRepository) UpdateWebAuthnChallenge(ctx context.Context, sessionID uuid.UUID, challenge *string) error {
+	return r.db.WithContext(ctx).
+		Model(&model.Session{}).
+		Where("id = ?", sessionID).
+		Update("webauthn_challenge", challenge).Error
+}
+
 // RevokeByUserID はユーザーに属する全ての有効なセッションを失効させる。
 func (r *SessionRepository) RevokeByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
 	now := time.Now()

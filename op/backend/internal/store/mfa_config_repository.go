@@ -25,7 +25,7 @@ func NewMfaConfigRepository(db *gorm.DB) *MfaConfigRepository {
 func (r *MfaConfigRepository) FindEnabledByUserID(ctx context.Context, userID uuid.UUID) (*model.MfaConfig, error) {
 	var config model.MfaConfig
 	err := r.db.WithContext(ctx).
-		Preload("TotpConfig").
+		Preload("TotpConfig").Preload("WebAuthnCredentials").
 		Where("user_id = ? AND enabled = true", userID).
 		First(&config).Error
 	if err != nil {
@@ -41,7 +41,7 @@ func (r *MfaConfigRepository) FindEnabledByUserID(ctx context.Context, userID uu
 func (r *MfaConfigRepository) FindByUserIDAndType(ctx context.Context, userID uuid.UUID, mfaType string) (*model.MfaConfig, error) {
 	var config model.MfaConfig
 	err := r.db.WithContext(ctx).
-		Preload("TotpConfig").
+		Preload("TotpConfig").Preload("WebAuthnCredentials").
 		Where("user_id = ? AND type = ?", userID, mfaType).
 		First(&config).Error
 	if err != nil {
@@ -51,6 +51,19 @@ func (r *MfaConfigRepository) FindByUserIDAndType(ctx context.Context, userID uu
 		return nil, fmt.Errorf("failed to find MFA config: %w", err)
 	}
 	return &config, nil
+}
+
+// FindAllEnabledByUserID はユーザーの全ての有効な MFA 設定を返す（複数方式対応）。
+func (r *MfaConfigRepository) FindAllEnabledByUserID(ctx context.Context, userID uuid.UUID) ([]model.MfaConfig, error) {
+	var configs []model.MfaConfig
+	err := r.db.WithContext(ctx).
+		Preload("TotpConfig").Preload("WebAuthnCredentials").
+		Where("user_id = ? AND enabled = true", userID).
+		Find(&configs).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to find enabled MFA configs: %w", err)
+	}
+	return configs, nil
 }
 
 // Create は MFA 設定を作成する。

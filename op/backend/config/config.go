@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -12,6 +13,9 @@ type Config struct {
 	BaseURL          string
 	KeyEncryptionKey string
 	FrontendBaseURL  string
+	WebAuthnRPID     string
+	WebAuthnRPName   string
+	WebAuthnRPOrigins []string
 }
 
 func Load() (*Config, error) {
@@ -41,6 +45,21 @@ func Load() (*Config, error) {
 
 	// issuer URL の末尾スラッシュを除去 (OIDC Discovery 1.0 Section 4.1)
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
+
+	// WebAuthn RP 設定: 環境変数があればそちらを優先、なければ FrontendBaseURL から導出
+	cfg.WebAuthnRPID = os.Getenv("OP_WEBAUTHN_RP_ID")
+	if cfg.WebAuthnRPID == "" {
+		if parsed, err := url.Parse(cfg.FrontendBaseURL); err == nil {
+			cfg.WebAuthnRPID = parsed.Hostname()
+		}
+	}
+
+	cfg.WebAuthnRPName = os.Getenv("OP_WEBAUTHN_RP_NAME")
+	if cfg.WebAuthnRPName == "" {
+		cfg.WebAuthnRPName = "OIDC Demo"
+	}
+
+	cfg.WebAuthnRPOrigins = []string{strings.TrimRight(cfg.FrontendBaseURL, "/")}
 
 	return cfg, nil
 }

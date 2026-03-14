@@ -11,6 +11,9 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 
 	"github.com/isurugi-k/oidc-demo/op/backend/config"
+	"github.com/go-webauthn/webauthn/protocol"
+	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
+
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/auth"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/crypto"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/database"
@@ -100,6 +103,30 @@ func main() {
 		mfaEncKey, "OIDC Demo",
 	)
 
+	// WebAuthn Store & Service 初期化
+	webauthnCredRepo := store.NewWebAuthnCredentialRepository(db)
+
+	webauthnLib, err := gowebauthn.New(&gowebauthn.Config{
+		RPDisplayName: cfg.WebAuthnRPName,
+		RPID:          cfg.WebAuthnRPID,
+		RPOrigins:     cfg.WebAuthnRPOrigins,
+		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			// パスキー（Discoverable Credential）として登録するために必須
+			ResidentKey:             protocol.ResidentKeyRequirementRequired,
+			UserVerification:        protocol.VerificationPreferred,
+			// platform: ブラウザのパスワードマネージャー（Touch ID / Windows Hello）を使用
+			AuthenticatorAttachment: protocol.Platform,
+		},
+	})
+	if err != nil {
+		log.Fatalf("failed to create WebAuthn instance: %v", err)
+	}
+
+	mfaWebAuthnSvc := auth.NewMFAWebAuthnService(
+		webauthnLib, mfaConfigRepo, mfaConfigRepo,
+		webauthnCredRepo, sessionRepo, sessionRepo,
+	)
+
 	// Auth ハンドラ初期化
 	loginHandler := auth.NewLoginHandler(authSvc, cfg.IsSecure())
 	meHandler := auth.NewMeHandler(authSvc, userRepo)
@@ -108,8 +135,22 @@ func main() {
 	mfaSetupHandler := auth.NewMFATOTPSetupHandler(mfaTOTPSvc, authSvc, userRepo)
 	mfaVerifySetupHandler := auth.NewMFATOTPVerifySetupHandler(mfaTOTPSvc, authSvc)
 	mfaVerifyHandler := auth.NewMFATOTPVerifyHandler(mfaTOTPSvc, authSvc)
+
+	// WebAuthn ハンドラ初期化
+	webauthnRegBeginHandler := auth.NewMFAWebAuthnRegisterBeginHandler(mfaWebAuthnSvc, authSvc, userRepo)
+	webauthnRegCompleteHandler := auth.NewMFAWebAuthnRegisterCompleteHandler(mfaWebAuthnSvc, authSvc)
+	webauthnAuthBeginHandler := auth.NewMFAWebAuthnAuthBeginHandler(mfaWebAuthnSvc, authSvc)
+	webauthnAuthCompleteHandler := auth.NewMFAWebAuthnAuthCompleteHandler(mfaWebAuthnSvc, authSvc)
+	webauthnCredsHandler := auth.NewMFAWebAuthnCredentialsHandler(mfaWebAuthnSvc, authSvc)
 	resetRequestHandler := auth.NewPasswordResetRequestHandler(passwordResetSvc)
 	resetHandler := auth.NewPasswordResetHandler(passwordResetSvc)
+
+	// パスキーログインサービス & ハンドラ初期化
+	passkeyLoginSvc := auth.NewPasskeyLoginService(
+		webauthnLib, mfaConfigRepo, webauthnCredRepo,
+		sessionRepo, userRepo, tenantRepo,
+	)
+	passkeyLoginHandler := auth.NewPasskeyLoginHandler(passkeyLoginSvc, cfg.IsSecure())
 
 	// OIDC ハンドラ初期化
 	jwksHandler := oidc.NewJWKSHandler(keySvc)
@@ -159,9 +200,17 @@ func main() {
 	e.POST("/internal/password/reset-request", resetRequestHandler.Handle)
 	e.POST("/internal/password/reset", resetHandler.Handle)
 	e.POST("/internal/consent", consentHandler.Handle)
+	e.POST("/internal/passkey/login/begin", passkeyLoginHandler.HandleBegin)
+	e.POST("/internal/passkey/login/complete", passkeyLoginHandler.HandleComplete)
 	e.POST("/internal/mfa/totp/setup", mfaSetupHandler.Handle)
 	e.POST("/internal/mfa/totp/verify-setup", mfaVerifySetupHandler.Handle)
 	e.POST("/internal/mfa/totp/verify", mfaVerifyHandler.Handle)
+	e.POST("/internal/mfa/webauthn/register/begin", webauthnRegBeginHandler.Handle)
+	e.POST("/internal/mfa/webauthn/register/complete", webauthnRegCompleteHandler.Handle)
+	e.POST("/internal/mfa/webauthn/authenticate/begin", webauthnAuthBeginHandler.Handle)
+	e.POST("/internal/mfa/webauthn/authenticate/complete", webauthnAuthCompleteHandler.Handle)
+	e.GET("/internal/mfa/webauthn/credentials", webauthnCredsHandler.HandleList)
+	e.DELETE("/internal/mfa/webauthn/credentials/:id", webauthnCredsHandler.HandleDelete)
 
 	// Admin auth サービス初期化
 	adminAuthSvc := management.NewAdminAuthService(adminUserRepo, adminSessionRepo, crypto.VerifyPassword)
