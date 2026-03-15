@@ -12,9 +12,10 @@ type RefreshToken struct {
 	ParentID        *uuid.UUID `gorm:"type:uuid"`
 	SessionID       uuid.UUID  `gorm:"type:uuid;not null;index"`
 	AccessTokenID   uuid.UUID  `gorm:"type:uuid;not null"`
-	ExpiresAt       time.Time  `gorm:"not null"`
-	RevokedAt       *time.Time
-	ReuseDetectedAt *time.Time
+	ExpiresAt         time.Time  `gorm:"not null"`
+	AbsoluteExpiresAt *time.Time
+	RevokedAt         *time.Time
+	ReuseDetectedAt   *time.Time
 
 	Parent      *RefreshToken `gorm:"foreignKey:ParentID"`
 	Session     Session       `gorm:"foreignKey:SessionID"`

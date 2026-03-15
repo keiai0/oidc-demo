@@ -22,6 +22,7 @@ type UserFinder interface {
 type SessionStore interface {
 	Create(ctx context.Context, session *model.Session) error
 	FindByID(ctx context.Context, id uuid.UUID) (*model.Session, error)
+	Revoke(ctx context.Context, id uuid.UUID) error
 }
 
 // LoginAttemptTracker はログイン試行の追跡操作を定義する。

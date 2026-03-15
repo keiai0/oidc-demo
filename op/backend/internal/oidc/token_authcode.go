@@ -15,6 +15,7 @@ type AuthCodeGrantInput struct {
 	Code         string
 	RedirectURI  string
 	CodeVerifier string
+	DPoPJKT      string // DPoP JWK Thumbprint (空の場合は Bearer)
 }
 
 // TokenResponse はトークンレスポンス
@@ -101,13 +102,18 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 
 	// アクセストークン生成
 	accessTokenLifetime := time.Duration(tenant.AccessTokenLifetime) * time.Second
-	accessJTI, accessTokenStr, err := h.tokenSigner.SignAccessToken(ctx, &model.AccessTokenClaims{
+	atClaims := &model.AccessTokenClaims{
 		Issuer:    issuer,
 		Subject:   userID,
 		Audience:  client.ClientID,
 		Scope:     authCode.Scope,
 		SessionID: authCode.SessionID.String(),
-	}, accessTokenLifetime)
+	}
+	// DPoP: cnf.jkt クレームを含める (RFC 9449 Section 6.1)
+	if input.DPoPJKT != "" {
+		atClaims.Confirmation = &model.TokenConfirmation{JKT: input.DPoPJKT}
+	}
+	accessJTI, accessTokenStr, err := h.tokenSigner.SignAccessToken(ctx, atClaims, accessTokenLifetime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign access token: %w", err)
 	}
@@ -119,6 +125,9 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 		ClientID:  client.ID,
 		Scope:     authCode.Scope,
 		ExpiresAt: time.Now().Add(accessTokenLifetime),
+	}
+	if input.DPoPJKT != "" {
+		accessToken.DPoPJKT = &input.DPoPJKT
 	}
 	if err := h.accessTokenStore.Create(ctx, accessToken); err != nil {
 		return nil, fmt.Errorf("failed to save access token: %w", err)
@@ -163,21 +172,44 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 			return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 		}
 
-		refreshTokenLifetime := time.Duration(tenant.RefreshTokenLifetime) * time.Second
+		now := time.Now()
+
+		// 絶対有効期限: クライアント設定 > テナント設定
+		absoluteLifetimeSec := tenant.RefreshTokenLifetime
+		if client.RefreshTokenLifetime != nil {
+			absoluteLifetimeSec = *client.RefreshTokenLifetime
+		}
+		absoluteExpiresAt := now.Add(time.Duration(absoluteLifetimeSec) * time.Second)
+
+		// スライディング有効期限: クライアントに idle_timeout 設定がある場合
+		expiresAt := absoluteExpiresAt
+		if client.RefreshTokenIdleTimeout != nil {
+			idleExpiresAt := now.Add(time.Duration(*client.RefreshTokenIdleTimeout) * time.Second)
+			if idleExpiresAt.Before(absoluteExpiresAt) {
+				expiresAt = idleExpiresAt
+			}
+		}
+
 		refreshToken := &model.RefreshToken{
-			TokenHash:     tokenHash,
-			SessionID:     authCode.SessionID,
-			AccessTokenID: accessToken.ID,
-			ExpiresAt:     time.Now().Add(refreshTokenLifetime),
+			TokenHash:         tokenHash,
+			SessionID:         authCode.SessionID,
+			AccessTokenID:     accessToken.ID,
+			ExpiresAt:         expiresAt,
+			AbsoluteExpiresAt: &absoluteExpiresAt,
 		}
 		if err := h.refreshTokenStore.Create(ctx, refreshToken); err != nil {
 			return nil, fmt.Errorf("failed to save refresh token: %w", err)
 		}
 	}
 
+	tokenType := "Bearer"
+	if input.DPoPJKT != "" {
+		tokenType = "DPoP"
+	}
+
 	return &TokenResponse{
 		AccessToken:  accessTokenStr,
-		TokenType:    "Bearer",
+		TokenType:    tokenType,
 		ExpiresIn:    tenant.AccessTokenLifetime,
 		RefreshToken: refreshTokenStr,
 		IDToken:      idTokenStr,

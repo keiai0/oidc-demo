@@ -118,6 +118,11 @@ func (s *AuthService) Login(ctx context.Context, input *model.LoginInput) (*mode
 
 	pendingMFA := mfaRequired || mfaSetupRequired
 
+	// セッション固定攻撃対策: 既存セッションがあれば失効させる
+	if input.OldSessionID != nil {
+		_ = s.sessionStore.Revoke(ctx, *input.OldSessionID)
+	}
+
 	// セッション作成
 	now := time.Now()
 	session := &model.Session{

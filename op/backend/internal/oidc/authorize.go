@@ -3,6 +3,7 @@ package oidc
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -22,6 +23,7 @@ type AuthorizeHandler struct {
 	authCodeStore       AuthorizationCodeStore
 	consentStore        ConsentStore
 	sessionValidator    SessionValidator
+	parStore            PARStore
 	loginPageURL        string
 }
 
@@ -32,6 +34,7 @@ func NewAuthorizeHandler(
 	authCodeStore AuthorizationCodeStore,
 	consentStore ConsentStore,
 	sessionValidator SessionValidator,
+	parStore PARStore,
 	loginPageURL string,
 ) *AuthorizeHandler {
 	return &AuthorizeHandler{
@@ -41,6 +44,7 @@ func NewAuthorizeHandler(
 		authCodeStore:       authCodeStore,
 		consentStore:        consentStore,
 		sessionValidator:    sessionValidator,
+		parStore:            parStore,
 		loginPageURL:        loginPageURL,
 	}
 }
@@ -60,18 +64,81 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "not_found"})
 	}
 
-	// リクエストパラメータ取得
-	responseType := c.QueryParam("response_type")
-	clientID := c.QueryParam("client_id")
-	redirectURI := c.QueryParam("redirect_uri")
-	scope := c.QueryParam("scope")
-	state := c.QueryParam("state")
-	nonce := c.QueryParam("nonce")
-	codeChallenge := c.QueryParam("code_challenge")
-	codeChallengeMethod := c.QueryParam("code_challenge_method")
-	prompt := c.QueryParam("prompt")
-	maxAgeStr := c.QueryParam("max_age")
-	acrValuesStr := c.QueryParam("acr_values")
+	// PAR (RFC 9126): request_uri パラメータの処理
+	requestURI := c.QueryParam("request_uri")
+	var responseType, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod, prompt, maxAgeStr, acrValuesStr string
+
+	if requestURI != "" {
+		// request_uri が指定されている場合、他のパラメータは client_id 以外禁止 (RFC 9126 Section 4)
+		clientID = c.QueryParam("client_id")
+
+		if h.parStore == nil {
+			return errorResponseDirect(c, "invalid_request", "PAR is not supported")
+		}
+
+		par, err := h.parStore.FindByRequestURI(ctx, requestURI)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+		}
+		if par == nil {
+			return errorResponseDirect(c, "invalid_request", "unknown request_uri")
+		}
+		if par.IsUsed() {
+			return errorResponseDirect(c, "invalid_request", "request_uri already used")
+		}
+		if par.IsExpired() {
+			return errorResponseDirect(c, "invalid_request", "request_uri expired")
+		}
+
+		// 使用済みにマーク
+		if err := h.parStore.MarkAsUsed(ctx, par.ID); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+		}
+
+		// PAR に保存されたパラメータを復元
+		var params map[string]string
+		if err := json.Unmarshal(par.Parameters, &params); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+		}
+
+		responseType = params["response_type"]
+		if clientID == "" {
+			clientID = params["client_id"]
+		}
+		redirectURI = params["redirect_uri"]
+		scope = params["scope"]
+		state = params["state"]
+		nonce = params["nonce"]
+		codeChallenge = params["code_challenge"]
+		codeChallengeMethod = params["code_challenge_method"]
+		prompt = params["prompt"]
+		maxAgeStr = params["max_age"]
+		acrValuesStr = params["acr_values"]
+
+		// PAR 解決後: リクエスト URL を通常パラメータに書き換える。
+		// ログイン後のリダイレクト先（redirect_after_login）が request_uri ではなく
+		// 解決済みパラメータを含むようにし、二重使用エラーを防ぐ。
+		resolvedQuery := url.Values{}
+		for k, v := range params {
+			if v != "" {
+				resolvedQuery.Set(k, v)
+			}
+		}
+		c.Request().URL.RawQuery = resolvedQuery.Encode()
+	} else {
+		// 通常のリクエストパラメータ取得
+		responseType = c.QueryParam("response_type")
+		clientID = c.QueryParam("client_id")
+		redirectURI = c.QueryParam("redirect_uri")
+		scope = c.QueryParam("scope")
+		state = c.QueryParam("state")
+		nonce = c.QueryParam("nonce")
+		codeChallenge = c.QueryParam("code_challenge")
+		codeChallengeMethod = c.QueryParam("code_challenge_method")
+		prompt = c.QueryParam("prompt")
+		maxAgeStr = c.QueryParam("max_age")
+		acrValuesStr = c.QueryParam("acr_values")
+	}
 
 	// prompt パラメータ解析・検証 (OIDC Core 1.0 Section 3.1.2.1)
 	prompts := parsePrompt(prompt)

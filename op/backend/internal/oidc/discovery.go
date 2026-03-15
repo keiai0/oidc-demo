@@ -41,6 +41,9 @@ func (h *DiscoveryHandler) Handle(c echo.Context) error {
 		"userinfo_endpoint":                     issuer + "/userinfo",
 		"jwks_uri":                              h.issuerBaseURL + "/jwks",
 		"revocation_endpoint":                   issuer + "/revoke",
+		"introspection_endpoint":                          issuer + "/introspect",
+		"pushed_authorization_request_endpoint":            issuer + "/par",
+		"require_pushed_authorization_requests":            false,
 		"response_types_supported":              []string{"code"},
 		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
 		"subject_types_supported":               []string{"public"},
@@ -54,7 +57,8 @@ func (h *DiscoveryHandler) Handle(c echo.Context) error {
 		"backchannel_logout_supported":            true,
 		"backchannel_logout_session_supported":    true,
 		"acr_values_supported":                  []string{"urn:mace:incommon:iap:bronze"},
-		"claims_supported":                      []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "acr", "amr", "sid", "name", "email", "email_verified"},
+		"dpop_signing_alg_values_supported":                []string{"RS256", "ES256"},
+		"claims_supported":                                 []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "acr", "amr", "sid", "name", "email", "email_verified"},
 	}
 
 	c.Response().Header().Set("Cache-Control", "public, max-age=86400")

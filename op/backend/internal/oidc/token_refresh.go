@@ -14,6 +14,7 @@ type RefreshTokenGrantInput struct {
 	ClientSecret string
 	RefreshToken string
 	Scope        string
+	DPoPJKT      string // DPoP JWK Thumbprint (空の場合は Bearer)
 }
 
 // handleRefreshTokenGrantLogic はリフレッシュトークングラントのビジネスロジック。
@@ -56,8 +57,13 @@ func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *
 		return nil, ErrInvalidGrant
 	}
 
-	// 有効期限チェック
+	// 有効期限チェック（スライディング有効期限）
 	if rt.ExpiresAt.Before(time.Now()) {
+		return nil, ErrInvalidGrant
+	}
+
+	// 絶対有効期限チェック（ローテーションでもリセットされない）
+	if rt.AbsoluteExpiresAt != nil && rt.AbsoluteExpiresAt.Before(time.Now()) {
 		return nil, ErrInvalidGrant
 	}
 
@@ -89,15 +95,26 @@ func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *
 		scope = input.Scope
 	}
 
+	// DPoP: 旧 AT が DPoP bound ならば新 AT も DPoP bound にする
+	dpopJKT := input.DPoPJKT
+	if dpopJKT == "" && rt.AccessToken.DPoPJKT != nil {
+		// DPoP bound トークンには DPoP proof が必須
+		return nil, ErrInvalidGrant
+	}
+
 	// 新しいアクセストークン生成
 	accessTokenLifetime := time.Duration(tenant.AccessTokenLifetime) * time.Second
-	accessJTI, accessTokenStr, err := h.tokenSigner.SignAccessToken(ctx, &model.AccessTokenClaims{
+	atClaims := &model.AccessTokenClaims{
 		Issuer:    issuer,
 		Subject:   userID,
 		Audience:  client.ClientID,
 		Scope:     scope,
 		SessionID: rt.SessionID.String(),
-	}, accessTokenLifetime)
+	}
+	if dpopJKT != "" {
+		atClaims.Confirmation = &model.TokenConfirmation{JKT: dpopJKT}
+	}
+	accessJTI, accessTokenStr, err := h.tokenSigner.SignAccessToken(ctx, atClaims, accessTokenLifetime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign access token: %w", err)
 	}
@@ -109,6 +126,9 @@ func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *
 		Scope:     scope,
 		ExpiresAt: time.Now().Add(accessTokenLifetime),
 	}
+	if dpopJKT != "" {
+		accessToken.DPoPJKT = &dpopJKT
+	}
 	if err := h.accessTokenStore.Create(ctx, accessToken); err != nil {
 		return nil, fmt.Errorf("failed to save access token: %w", err)
 	}
@@ -119,21 +139,45 @@ func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
-	refreshTokenLifetime := time.Duration(tenant.RefreshTokenLifetime) * time.Second
+	now := time.Now()
+
+	// 絶対有効期限は旧トークンから継承（リセットしない）
+	absoluteExpiresAt := rt.AbsoluteExpiresAt
+
+	// ExpiresAt: idle timeout があればそちらを使用、なければ絶対有効期限
+	var expiresAt time.Time
+	if client.RefreshTokenIdleTimeout != nil {
+		expiresAt = now.Add(time.Duration(*client.RefreshTokenIdleTimeout) * time.Second)
+	} else {
+		refreshTokenLifetime := time.Duration(tenant.RefreshTokenLifetime) * time.Second
+		expiresAt = now.Add(refreshTokenLifetime)
+	}
+
+	// ExpiresAt は絶対有効期限を超えない
+	if absoluteExpiresAt != nil && expiresAt.After(*absoluteExpiresAt) {
+		expiresAt = *absoluteExpiresAt
+	}
+
 	newRefreshToken := &model.RefreshToken{
-		TokenHash:     newTokenHash,
-		ParentID:      &rt.ID,
-		SessionID:     rt.SessionID,
-		AccessTokenID: accessToken.ID,
-		ExpiresAt:     time.Now().Add(refreshTokenLifetime),
+		TokenHash:         newTokenHash,
+		ParentID:          &rt.ID,
+		SessionID:         rt.SessionID,
+		AccessTokenID:     accessToken.ID,
+		ExpiresAt:         expiresAt,
+		AbsoluteExpiresAt: absoluteExpiresAt,
 	}
 	if err := h.refreshTokenStore.Create(ctx, newRefreshToken); err != nil {
 		return nil, fmt.Errorf("failed to save refresh token: %w", err)
 	}
 
+	tokenType := "Bearer"
+	if dpopJKT != "" {
+		tokenType = "DPoP"
+	}
+
 	return &TokenResponse{
 		AccessToken:  accessTokenStr,
-		TokenType:    "Bearer",
+		TokenType:    tokenType,
 		ExpiresIn:    tenant.AccessTokenLifetime,
 		RefreshToken: newRefreshTokenStr,
 		Scope:        scope,

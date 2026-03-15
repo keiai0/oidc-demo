@@ -106,6 +106,21 @@ type PostLogoutRedirectURILister interface {
 	ListByClientID(ctx context.Context, clientDBID uuid.UUID) ([]model.PostLogoutRedirectURI, error)
 }
 
+// DPoPJTIStore は DPoP proof JWT の JTI リプレイ防止キャッシュを操作する (RFC 9449)。
+type DPoPJTIStore interface {
+	// Exists は JTI がキャッシュに存在するかを返す。
+	Exists(ctx context.Context, jti string) (bool, error)
+	// Create は JTI をキャッシュに登録する。
+	Create(ctx context.Context, jti string) error
+}
+
+// PARStore は Pushed Authorization Request (RFC 9126) の永続化操作を定義する。
+type PARStore interface {
+	Create(ctx context.Context, par *model.PushedAuthorizationRequest) error
+	FindByRequestURI(ctx context.Context, requestURI string) (*model.PushedAuthorizationRequest, error)
+	MarkAsUsed(ctx context.Context, id uuid.UUID) error
+}
+
 type (
 	VerifyPasswordFunc      func(password, hash string) (bool, error)
 	VerifyCodeChallengeFunc func(verifier, challenge string) bool

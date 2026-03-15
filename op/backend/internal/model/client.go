@@ -37,6 +37,8 @@ type Client struct {
 	ResponseTypes           StringSlice `gorm:"type:jsonb;not null"`
 	TokenEndpointAuthMethod string      `gorm:"type:varchar(63);not null;default:'client_secret_basic'"`
 	RequirePKCE             bool        `gorm:"not null;default:true"`
+	RefreshTokenLifetime    *int        `gorm:"type:int"`
+	RefreshTokenIdleTimeout *int        `gorm:"type:int"`
 	FrontchannelLogoutURI   *string     `gorm:"type:varchar(2048)"`
 	BackchannelLogoutURI    *string     `gorm:"type:varchar(2048)"`
 	Status                  string      `gorm:"type:varchar(31);not null;default:'active'"`

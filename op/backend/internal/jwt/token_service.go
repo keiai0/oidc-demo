@@ -84,7 +84,7 @@ func (s *TokenService) SignAccessToken(ctx context.Context, claims *model.Access
 	now := time.Now()
 	jti := uuid.New().String()
 
-	token, err := jwt.NewBuilder().
+	builder := jwt.NewBuilder().
 		Issuer(claims.Issuer).
 		Subject(claims.Subject).
 		Audience([]string{claims.Audience}).
@@ -92,8 +92,14 @@ func (s *TokenService) SignAccessToken(ctx context.Context, claims *model.Access
 		Expiration(now.Add(lifetime)).
 		JwtID(jti).
 		Claim("scope", claims.Scope).
-		Claim("sid", claims.SessionID).
-		Build()
+		Claim("sid", claims.SessionID)
+
+	// DPoP: cnf クレーム (RFC 9449 Section 6.1)
+	if claims.Confirmation != nil {
+		builder = builder.Claim("cnf", map[string]string{"jkt": claims.Confirmation.JKT})
+	}
+
+	token, err := builder.Build()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to build access token: %w", err)
 	}
@@ -155,12 +161,22 @@ func (s *TokenService) ValidateAccessToken(ctx context.Context, tokenString stri
 		return nil, fmt.Errorf("invalid session id in access token: %w", err)
 	}
 
+	// DPoP: cnf.jkt を抽出 (RFC 9449 Section 6.1)
+	var dpopJKT *string
+	var cnf map[string]interface{}
+	if err := token.Get("cnf", &cnf); err == nil {
+		if jkt, ok := cnf["jkt"].(string); ok && jkt != "" {
+			dpopJKT = &jkt
+		}
+	}
+
 	return &model.AccessTokenResult{
 		JTI:       jti,
 		Subject:   subUUID,
 		ClientID:  clientID,
 		Scope:     scope,
 		SessionID: sessionUUID,
+		DPoPJKT:   dpopJKT,
 	}, nil
 }
 

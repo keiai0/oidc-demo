@@ -8,13 +8,14 @@ import (
 )
 
 type Config struct {
-	Port             string
-	DSN              string
-	BaseURL          string
-	KeyEncryptionKey string
-	FrontendBaseURL  string
-	WebAuthnRPID     string
-	WebAuthnRPName   string
+	Port              string
+	DSN               string
+	BaseURL           string
+	KeyEncryptionKey  string
+	FrontendBaseURL   string
+	AllowedRPOrigins  []string
+	WebAuthnRPID      string
+	WebAuthnRPName    string
 	WebAuthnRPOrigins []string
 }
 
@@ -45,6 +46,16 @@ func Load() (*Config, error) {
 
 	// issuer URL の末尾スラッシュを除去 (OIDC Discovery 1.0 Section 4.1)
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
+
+	// RP オリジン（CORS 用、カンマ区切り）
+	if rpOrigins := os.Getenv("OP_ALLOWED_RP_ORIGINS"); rpOrigins != "" {
+		for _, origin := range strings.Split(rpOrigins, ",") {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				cfg.AllowedRPOrigins = append(cfg.AllowedRPOrigins, origin)
+			}
+		}
+	}
 
 	// WebAuthn RP 設定: 環境変数があればそちらを優先、なければ FrontendBaseURL から導出
 	cfg.WebAuthnRPID = os.Getenv("OP_WEBAUTHN_RP_ID")

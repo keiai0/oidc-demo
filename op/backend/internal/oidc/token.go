@@ -19,6 +19,7 @@ type TokenHandler struct {
 	verifyCodeChallenge VerifyCodeChallengeFunc
 	computeATHash       ComputeATHashFunc
 	sha256Hex           SHA256HexFunc
+	dpopJTIStore        DPoPJTIStore
 	issuerBaseURL       string
 }
 
@@ -34,6 +35,7 @@ func NewTokenHandler(
 	verifyCodeChallenge VerifyCodeChallengeFunc,
 	computeATHash ComputeATHashFunc,
 	sha256Hex SHA256HexFunc,
+	dpopJTIStore DPoPJTIStore,
 	issuerBaseURL string,
 ) *TokenHandler {
 	return &TokenHandler{
@@ -48,6 +50,7 @@ func NewTokenHandler(
 		verifyCodeChallenge: verifyCodeChallenge,
 		computeATHash:       computeATHash,
 		sha256Hex:           sha256Hex,
+		dpopJTIStore:        dpopJTIStore,
 		issuerBaseURL:       issuerBaseURL,
 	}
 }
@@ -59,19 +62,34 @@ func (h *TokenHandler) Handle(c echo.Context) error {
 	c.Response().Header().Set("Cache-Control", "no-store")
 	c.Response().Header().Set("Pragma", "no-cache")
 
+	// DPoP proof 検証 (RFC 9449)
+	var dpopJKT string
+	dpopProof := c.Request().Header.Get("DPoP")
+	if dpopProof != "" {
+		// htu はクライアントが知る外部 URL で検証する（Docker 内部 URL ではなく）
+		tenantCode := c.Param("tenant_code")
+		httpURL := h.issuerBaseURL + "/" + tenantCode + "/token"
+
+		result, err := VerifyDPoPProof(c.Request().Context(), dpopProof, "POST", httpURL, h.dpopJTIStore)
+		if err != nil {
+			return tokenError(c, http.StatusBadRequest, "invalid_dpop_proof", err.Error())
+		}
+		dpopJKT = result.JKT
+	}
+
 	grantType := c.FormValue("grant_type")
 
 	switch grantType {
 	case "authorization_code":
-		return h.handleAuthCodeGrant(c)
+		return h.handleAuthCodeGrant(c, dpopJKT)
 	case "refresh_token":
-		return h.handleRefreshTokenGrant(c)
+		return h.handleRefreshTokenGrant(c, dpopJKT)
 	default:
 		return tokenError(c, http.StatusBadRequest, "unsupported_grant_type", "")
 	}
 }
 
-func (h *TokenHandler) handleAuthCodeGrant(c echo.Context) error {
+func (h *TokenHandler) handleAuthCodeGrant(c echo.Context, dpopJKT string) error {
 	// クライアント認証: client_secret_post または client_secret_basic
 	clientID, clientSecret := extractClientCredentials(c)
 	if clientID == "" || clientSecret == "" {
@@ -92,6 +110,7 @@ func (h *TokenHandler) handleAuthCodeGrant(c echo.Context) error {
 		Code:         code,
 		RedirectURI:  redirectURI,
 		CodeVerifier: codeVerifier,
+		DPoPJKT:      dpopJKT,
 	})
 	if err != nil {
 		if errors.Is(err, ErrInvalidClient) {
@@ -107,7 +126,7 @@ func (h *TokenHandler) handleAuthCodeGrant(c echo.Context) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
-func (h *TokenHandler) handleRefreshTokenGrant(c echo.Context) error {
+func (h *TokenHandler) handleRefreshTokenGrant(c echo.Context, dpopJKT string) error {
 	clientID, clientSecret := extractClientCredentials(c)
 	if clientID == "" || clientSecret == "" {
 		return tokenError(c, http.StatusUnauthorized, "invalid_client", "client credentials required")
@@ -125,6 +144,7 @@ func (h *TokenHandler) handleRefreshTokenGrant(c echo.Context) error {
 		ClientSecret: clientSecret,
 		RefreshToken: refreshToken,
 		Scope:        scope,
+		DPoPJKT:      dpopJKT,
 	})
 	if err != nil {
 		if errors.Is(err, ErrInvalidClient) {

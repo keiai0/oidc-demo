@@ -153,19 +153,28 @@ func main() {
 	)
 	passkeyLoginHandler := auth.NewPasskeyLoginHandler(passkeyLoginSvc, cfg.IsSecure())
 
+	// PAR Store 初期化
+	parRepo := store.NewPushedAuthorizationRequestRepository(db)
+
+	// DPoP JTI Cache 初期化
+	dpopJTIRepo := store.NewDPoPJTICacheRepository(db)
+
 	// OIDC ハンドラ初期化
 	jwksHandler := oidc.NewJWKSHandler(keySvc)
 	discoveryHandler := oidc.NewDiscoveryHandler(cfg.BaseURL, tenantRepo)
-	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, userConsentRepo, authSvc, cfg.FrontendBaseURL)
+	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, userConsentRepo, authSvc, parRepo, cfg.FrontendBaseURL)
+	parHandler := oidc.NewPARHandler(clientRepo, tenantRepo, tenantClientRepo, parRepo, crypto.VerifyPassword)
 	tokenHandler := oidc.NewTokenHandler(
 		authCodeRepo, accessTokenRepo, refreshTokenRepo, idTokenRepo,
 		clientRepo, tenantRepo, tokenSvc,
 		crypto.VerifyPassword, crypto.VerifyCodeChallenge,
 		jwt.ComputeATHash, jwt.SHA256Hex,
+		dpopJTIRepo,
 		cfg.BaseURL,
 	)
-	userInfoHandler := oidc.NewUserInfoHandler(tokenSvc, userRepo, accessTokenRepo)
+	userInfoHandler := oidc.NewUserInfoHandler(tokenSvc, userRepo, accessTokenRepo, dpopJTIRepo, cfg.BaseURL)
 	revokeHandler := oidc.NewRevokeHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, crypto.VerifyPassword, jwt.SHA256Hex)
+	introspectHandler := oidc.NewIntrospectHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, userRepo, crypto.VerifyPassword, jwt.SHA256Hex)
 
 	// SLO (Single Logout) ハンドラ初期化
 	backChannelClient := &http.Client{Timeout: 10 * time.Second}
@@ -186,11 +195,15 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	// CORS (OP Frontend からの呼び出しを許可)
+	// セキュリティヘッダー（全レスポンス）
+	e.Use(oidc.SecurityHeadersMiddleware(cfg.IsSecure()))
+
+	// CORS: OP Frontend + RP オリジンを統合（/internal/* は AllowCredentials で Cookie 送信許可）
+	allOrigins := append([]string{cfg.FrontendBaseURL}, cfg.AllowedRPOrigins...)
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     []string{cfg.FrontendBaseURL},
+		AllowOrigins:     allOrigins,
 		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions},
-		AllowHeaders:     []string{echo.HeaderContentType, echo.HeaderAccept},
+		AllowHeaders:     []string{echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization, "DPoP"},
 		AllowCredentials: true,
 	}))
 
@@ -206,6 +219,8 @@ func main() {
 	e.POST("/:tenant_code/token", tokenHandler.Handle)
 	e.GET("/:tenant_code/userinfo", userInfoHandler.Handle)
 	e.POST("/:tenant_code/revoke", revokeHandler.Handle)
+	e.POST("/:tenant_code/introspect", introspectHandler.Handle)
+	e.POST("/:tenant_code/par", parHandler.Handle)
 	e.GET("/:tenant_code/logout", logoutHandler.Handle)
 	e.POST("/:tenant_code/logout", logoutHandler.Handle)
 

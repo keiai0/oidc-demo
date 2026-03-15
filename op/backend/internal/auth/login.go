@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/model"
@@ -41,6 +42,13 @@ func (h *LoginHandler) Handle(c echo.Context) error {
 		Password:   req.Password,
 		IPAddress:  c.RealIP(),
 		UserAgent:  c.Request().UserAgent(),
+	}
+
+	// セッション固定攻撃対策: 既存セッション Cookie があれば旧セッション ID を渡す
+	if oldCookie, err := c.Cookie("op_session"); err == nil && oldCookie.Value != "" {
+		if oldID, parseErr := uuid.Parse(oldCookie.Value); parseErr == nil {
+			input.OldSessionID = &oldID
+		}
 	}
 
 	output, err := h.authSvc.Login(c.Request().Context(), input)

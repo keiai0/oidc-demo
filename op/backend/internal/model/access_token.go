@@ -12,6 +12,7 @@ type AccessToken struct {
 	SessionID uuid.UUID  `gorm:"type:uuid;not null"`
 	ClientID  uuid.UUID  `gorm:"type:uuid;not null"`
 	Scope     string     `gorm:"type:varchar(1024);not null"`
+	DPoPJKT   *string    `gorm:"type:varchar(255);column:dpop_jkt"`
 	ExpiresAt time.Time  `gorm:"not null"`
 	RevokedAt *time.Time
 
