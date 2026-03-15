@@ -101,3 +101,29 @@ export async function revokeSession(sessionId: string) {
     .set({ revokedAt: new Date() })
     .where(eq(sessions.id, sessionId));
 }
+
+/** ログアウト用にセッションの idToken を取得する（復号不要、OP に渡すだけ） */
+export async function getSessionForLogout(sessionId: string) {
+  const db = getDb();
+  const [session] = await db
+    .select({
+      id: sessions.id,
+      idToken: sessions.idToken,
+    })
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt)))
+    .limit(1);
+
+  return session ?? null;
+}
+
+/** OP セッション ID に紐づく RP セッションを全て失効させる（Back-Channel Logout 用） */
+export async function revokeByOpSessionId(opSessionId: string) {
+  const db = getDb();
+  await db
+    .update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(eq(sessions.opSessionId, opSessionId), isNull(sessions.revokedAt)),
+    );
+}
