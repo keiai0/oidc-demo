@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS clients (
     frontchannel_logout_uri     VARCHAR(2048),
     backchannel_logout_uri      VARCHAR(2048),
     status                      VARCHAR(31) NOT NULL DEFAULT 'active',
+    refresh_token_lifetime      INT,
+    refresh_token_idle_timeout  INT,
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -24,4 +26,6 @@ COMMENT ON COLUMN clients.token_endpoint_auth_method IS 'トークンエンド�
 COMMENT ON COLUMN clients.require_pkce IS 'PKCE必須フラグ（S256のみサポート）';
 COMMENT ON COLUMN clients.frontchannel_logout_uri IS 'Front-Channel Logout 通知先';
 COMMENT ON COLUMN clients.backchannel_logout_uri IS 'Back-Channel Logout 通知先';
+COMMENT ON COLUMN clients.refresh_token_lifetime IS 'クライアント固有のリフレッシュトークン絶対有効期限(秒)。NULLの場合はテナント設定に従う';
+COMMENT ON COLUMN clients.refresh_token_idle_timeout IS 'リフレッシュトークンのアイドルタイムアウト(秒)。NULLの場合はスライディング有効期限なし';
 COMMENT ON COLUMN clients.status IS 'active / disabled';

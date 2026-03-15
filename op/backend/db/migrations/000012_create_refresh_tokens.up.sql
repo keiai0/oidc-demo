@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     session_id          UUID NOT NULL REFERENCES sessions(id),
     access_token_id     UUID NOT NULL REFERENCES access_tokens(id),
     expires_at          TIMESTAMPTZ NOT NULL,
+    absolute_expires_at TIMESTAMPTZ,
     revoked_at          TIMESTAMPTZ,
     reuse_detected_at   TIMESTAMPTZ
 );
@@ -17,4 +18,5 @@ COMMENT ON COLUMN refresh_tokens.token_hash IS 'トークンのハッシュ値';
 COMMENT ON COLUMN refresh_tokens.parent_id IS 'ローテーション元トークン。Reuse Detection 用';
 COMMENT ON COLUMN refresh_tokens.session_id IS '再利用検知時にセッション全体を失効させるために必要';
 COMMENT ON COLUMN refresh_tokens.access_token_id IS '対応するアクセストークン';
+COMMENT ON COLUMN refresh_tokens.absolute_expires_at IS 'リフレッシュトークンの絶対有効期限。ローテーション時にも変わらない';
 COMMENT ON COLUMN refresh_tokens.reuse_detected_at IS '再利用検知日時（監査用）';
