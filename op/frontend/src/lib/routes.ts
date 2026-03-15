@@ -1,5 +1,6 @@
 export const routes = {
   login: "/login",
+  logout: "/logout",
   management: {
     root: "/management",
     login: "/management/login",
