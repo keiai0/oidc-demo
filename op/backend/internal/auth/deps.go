@@ -72,6 +72,44 @@ type UserFinderByEmail interface {
 // EmailSender はメール送信操作を定義する。
 type EmailSender interface {
 	SendPasswordResetEmail(ctx context.Context, email, token string) error
+	// SendEmailChangeEmail は変更先メールアドレス宛に確認メールを送信する。
+	SendEmailChangeEmail(ctx context.Context, newEmail, token string) error
+}
+
+// EmailChangeTokenStore はメールアドレス変更トークンの永続化操作を定義する。
+type EmailChangeTokenStore interface {
+	// Create はメールアドレス変更トークンを作成する。
+	Create(ctx context.Context, token *model.EmailChangeToken) error
+	// FindByTokenHash はトークンハッシュで変更トークンを検索する。
+	FindByTokenHash(ctx context.Context, hash string) (*model.EmailChangeToken, error)
+	// MarkAsUsed はトークンを使用済みにする。
+	MarkAsUsed(ctx context.Context, id uuid.UUID) error
+	// InvalidateByUserID はユーザーの未使用変更トークンを全て無効化する。
+	InvalidateByUserID(ctx context.Context, userID uuid.UUID) error
+}
+
+// UserEmailUpdater はユーザーのメールアドレス更新を定義する。
+type UserEmailUpdater interface {
+	// UpdateEmail はメールアドレスを更新し email_verified を true にする。
+	UpdateEmail(ctx context.Context, userID uuid.UUID, newEmail string) error
+}
+
+// BackupCodeStore は MFA バックアップコードの永続化操作を定義する。
+type BackupCodeStore interface {
+	// Create はバックアップコードを作成する。
+	Create(ctx context.Context, code *model.BackupCode) error
+	// FindUnusedByUserID はユーザーの未使用バックアップコード一覧を返す。
+	FindUnusedByUserID(ctx context.Context, userID uuid.UUID) ([]model.BackupCode, error)
+	// MarkAsUsed はバックアップコードを使用済みにする。
+	MarkAsUsed(ctx context.Context, id uuid.UUID) error
+	// DeleteByUserID はユーザーのバックアップコードを全て削除する。
+	DeleteByUserID(ctx context.Context, userID uuid.UUID) error
+}
+
+// SessionLister はユーザーのアクティブセッション一覧取得を定義する。
+type SessionLister interface {
+	// FindActiveByUserID はユーザーのアクティブセッション一覧を返す。
+	FindActiveByUserID(ctx context.Context, userID uuid.UUID) ([]model.Session, error)
 }
 
 type PasswordVerifyFunc func(password, hash string) (bool, error)

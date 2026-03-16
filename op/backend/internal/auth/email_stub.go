@@ -19,3 +19,9 @@ func (s *StubEmailSender) SendPasswordResetEmail(_ context.Context, email, token
 	log.Printf("[STUB EMAIL] Password reset token for %s: %s", email, token)
 	return nil
 }
+
+// SendEmailChangeEmail はメールアドレス変更確認トークンをログに出力する。
+func (s *StubEmailSender) SendEmailChangeEmail(_ context.Context, newEmail, token string) error {
+	log.Printf("[STUB EMAIL] Email change verification token for %s: %s", newEmail, token)
+	return nil
+}
