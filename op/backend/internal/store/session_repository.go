@@ -91,3 +91,14 @@ func (r *SessionRepository) RevokeByUserID(ctx context.Context, userID uuid.UUID
 		Update("revoked_at", now)
 	return result.RowsAffected, result.Error
 }
+
+// FindActiveByUserID はユーザーのアクティブなセッション一覧を返す（作成日時降順）。
+// revoked_at IS NULL かつ expires_at > NOW() のセッションを対象とする。
+func (r *SessionRepository) FindActiveByUserID(ctx context.Context, userID uuid.UUID) ([]model.Session, error) {
+	var sessions []model.Session
+	result := r.db.WithContext(ctx).
+		Where("user_id = ? AND revoked_at IS NULL AND expires_at > NOW()", userID).
+		Order("created_at DESC").
+		Find(&sessions)
+	return sessions, result.Error
+}

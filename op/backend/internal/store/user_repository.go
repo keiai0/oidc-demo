@@ -104,3 +104,15 @@ func (r *UserRepository) ResetFailedLogin(ctx context.Context, id uuid.UUID) err
 			"locked_until":      nil,
 		}).Error
 }
+
+// UpdateEmail はユーザーのメールアドレスを更新し、email_verified を true にする。
+// メールアドレス変更トークンの検証完了後に呼び出す。
+func (r *UserRepository) UpdateEmail(ctx context.Context, id uuid.UUID, newEmail string) error {
+	return r.db.WithContext(ctx).
+		Model(&model.User{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"email":          newEmail,
+			"email_verified": true,
+		}).Error
+}
