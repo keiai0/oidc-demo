@@ -4,6 +4,7 @@ import {
   varchar,
   text,
   timestamp,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const rpSchema = pgSchema("rp");
@@ -32,6 +33,8 @@ export const sessions = rpSchema.table("sessions", {
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token"),
   idToken: text("id_token").notNull(),
+  tokenType: varchar("token_type", { length: 31 }).notNull().default("Bearer"),
+  userinfoJson: jsonb("userinfo_json"),
   tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }).notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),

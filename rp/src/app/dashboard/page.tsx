@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { getSessionId } from "@/lib/session";
 import { getSessionWithUser } from "@/lib/db/queries/session";
-import { fetchUserInfo } from "@/lib/oidc/userinfo";
+import { introspectToken } from "@/lib/oidc/introspect";
 import { TokenViewer } from "@/components/token-viewer";
 import { UserInfoViewer } from "@/components/userinfo-viewer";
+import { IntrospectionViewer } from "@/components/introspection-viewer";
 import { SessionInfo } from "@/components/session-info";
 import { LogoutButton } from "@/components/logout-button";
 
@@ -18,13 +19,18 @@ export default async function DashboardPage() {
 
   const { session, user } = result;
 
-  // UserInfo エンドポイントからリアルタイム取得
-  let userInfo: Record<string, unknown> | null = null;
-  let userInfoError: string | null = null;
+  // UserInfo はコールバック時に取得・保存済みのキャッシュを使用
+  // DPoP-bound トークンの場合、ダッシュボードから直接 userinfo API を呼べないため
+  const userInfo = (session.userinfoJson as Record<string, unknown>) ?? null;
+
+  // Token Introspection: サーバーサイドでトークンの有効性をリアルタイム確認
+  let introspectionResult: Record<string, unknown> | null = null;
+  let introspectionError: string | null = null;
   try {
-    userInfo = await fetchUserInfo(session.accessToken);
+    introspectionResult = await introspectToken(session.accessToken);
   } catch (e) {
-    userInfoError = e instanceof Error ? e.message : "取得に失敗しました";
+    introspectionError =
+      e instanceof Error ? e.message : "Introspection に失敗しました";
   }
 
   return (
@@ -47,6 +53,7 @@ export default async function DashboardPage() {
           opSub={user.opSub}
           email={user.email}
           name={user.name}
+          tokenType={session.tokenType}
           tokenExpiresAt={session.tokenExpiresAt.toISOString()}
           sessionExpiresAt={session.expiresAt.toISOString()}
         />
@@ -55,7 +62,9 @@ export default async function DashboardPage() {
 
         <TokenViewer title="アクセストークン" token={session.accessToken} />
 
-        <UserInfoViewer data={userInfo} error={userInfoError} />
+        <UserInfoViewer data={userInfo} error={null} />
+
+        <IntrospectionViewer data={introspectionResult} error={introspectionError} />
       </div>
     </div>
   );

@@ -10,6 +10,8 @@ interface CreateSessionParams {
   accessToken: string;
   refreshToken?: string;
   idToken: string;
+  tokenType?: string;
+  userinfoJson?: Record<string, unknown>;
   tokenExpiresAt: Date;
   expiresAt: Date;
 }
@@ -29,6 +31,8 @@ export async function createSession(params: CreateSessionParams) {
         ? encrypt(params.refreshToken, encKey)
         : null,
       idToken: params.idToken,
+      tokenType: params.tokenType ?? "Bearer",
+      userinfoJson: params.userinfoJson ?? null,
       tokenExpiresAt: params.tokenExpiresAt,
       expiresAt: params.expiresAt,
     })

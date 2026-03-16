@@ -1,38 +1,24 @@
+import * as client from "openid-client";
 import { getOIDCConfig } from "./config";
-import { getEnv } from "../env";
 
-/** OP の userinfo エンドポイントからユーザー情報を取得する */
+/**
+ * OP の userinfo エンドポイントからユーザー情報を取得する。
+ * DPoP Handle が渡された場合は DPoP proof を自動付与する。
+ */
 export async function fetchUserInfo(
   accessToken: string,
+  expectedSub: string,
+  dpopHandle?: client.DPoPHandle,
 ): Promise<Record<string, unknown>> {
   const config = await getOIDCConfig();
-  const env = getEnv();
 
-  // Discovery メタデータの URL はブラウザ向け（http://localhost:8080）
-  // サーバーサイドから呼ぶ場合は内部 URL（http://op-backend:8080）に書き換える
-  let userinfoEndpoint = config.serverMetadata().userinfo_endpoint;
-  if (!userinfoEndpoint) {
-    throw new Error("UserInfo エンドポイントが Discovery メタデータに含まれていません");
-  }
+  // openid-client の fetchUserInfo を使用（DPoP proof 自動生成対応）
+  const userInfo = await client.fetchUserInfo(
+    config,
+    accessToken,
+    expectedSub,
+    dpopHandle ? { DPoP: dpopHandle } : undefined,
+  );
 
-  if (env.oidc.issuer !== env.oidc.issuerInternal) {
-    userinfoEndpoint = userinfoEndpoint.replace(
-      env.oidc.issuer,
-      env.oidc.issuerInternal,
-    );
-  }
-
-  const response = await fetch(userinfoEndpoint, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `UserInfo リクエスト失敗: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  return response.json();
+  return userInfo as Record<string, unknown>;
 }

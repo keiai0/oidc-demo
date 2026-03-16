@@ -55,7 +55,12 @@ export async function GET(request: NextRequest) {
     );
 
     // UserInfo からユーザー情報を取得（ID トークンに含まれないクレームを補完）
-    const userInfo = await fetchUserInfo(tokens.accessToken);
+    // DPoP 使用時は dpopHandle を渡して proof JWT を自動付与
+    const userInfo = await fetchUserInfo(
+      tokens.accessToken,
+      tokens.claims.sub,
+      tokens.dpopHandle,
+    );
 
     // RP ユーザー upsert
     const sub = tokens.claims.sub;
@@ -74,6 +79,8 @@ export async function GET(request: NextRequest) {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       idToken: tokens.idToken,
+      tokenType: tokens.tokenType,
+      userinfoJson: userInfo,
       tokenExpiresAt: tokens.expiresAt,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 時間
     });

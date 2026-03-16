@@ -7,6 +7,8 @@ CREATE TABLE "rp"."sessions" (
 	"access_token" text NOT NULL,
 	"refresh_token" text,
 	"id_token" text NOT NULL,
+	"token_type" varchar(31) DEFAULT 'Bearer' NOT NULL,
+	"userinfo_json" jsonb,
 	"token_expires_at" timestamp with time zone NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"revoked_at" timestamp with time zone,

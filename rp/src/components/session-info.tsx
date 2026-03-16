@@ -5,6 +5,7 @@ interface SessionInfoProps {
   opSub: string;
   email: string | null;
   name: string | null;
+  tokenType?: string;
   tokenExpiresAt: string;
   sessionExpiresAt: string;
 }
@@ -17,6 +18,7 @@ export function SessionInfo(props: SessionInfoProps) {
     { label: "OP Subject (sub)", value: props.opSub },
     { label: "メール", value: props.email ?? "-" },
     { label: "名前", value: props.name ?? "-" },
+    { label: "トークン種別", value: props.tokenType ?? "Bearer" },
     {
       label: "トークン有効期限",
       value: new Date(props.tokenExpiresAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }),
