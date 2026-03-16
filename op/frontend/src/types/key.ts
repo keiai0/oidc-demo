@@ -1,7 +1,7 @@
 export type SignKey = {
   kid: string;
   algorithm: string;
-  active: boolean;
+  status: "active" | "passive" | "expired";
   created_at: string;
   rotated_at?: string;
 };

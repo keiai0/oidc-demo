@@ -74,11 +74,11 @@ export default function KeysPage() {
     },
     {
       header: "ステータス",
-      cell: (k: SignKey) => (
-        <Badge variant={k.active ? "active" : "inactive"}>
-          {k.active ? "有効" : "無効"}
-        </Badge>
-      ),
+      cell: (k: SignKey) => {
+        const variant = k.status === "active" ? "active" : "inactive";
+        const label = { active: "有効", passive: "猶予期間", expired: "期限切れ" }[k.status] ?? k.status;
+        return <Badge variant={variant}>{label}</Badge>;
+      },
     },
     {
       header: "作成日時",
@@ -91,7 +91,7 @@ export default function KeysPage() {
     {
       header: "操作",
       cell: (k: SignKey) =>
-        k.active ? (
+        k.status === "active" ? (
           <button
             onClick={() => handleDeactivate(k.kid)}
             className="text-red-600 hover:underline text-xs"
