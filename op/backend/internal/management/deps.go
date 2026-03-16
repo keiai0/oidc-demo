@@ -77,14 +77,14 @@ type PostLogoutRedirectURIStore interface {
 
 // SignKeyStore は管理機能向けの署名鍵永続化操作を定義する。
 type SignKeyStore interface {
-	// FindAll は有効・無効を問わず全ての署名鍵を返す。
+	// FindAll は全ての署名鍵を返す。
 	FindAll(ctx context.Context) ([]model.SignKey, error)
 	// FindByKID は鍵 ID で署名鍵を検索する。
 	FindByKID(ctx context.Context, kid string) (*model.SignKey, error)
-	// Deactivate は鍵を無効化する。
-	Deactivate(ctx context.Context, kid string) error
-	// FindAllActive は全ての有効な署名鍵を返す。
-	FindAllActive(ctx context.Context) ([]model.SignKey, error)
+	// FindAllByStatus は指定ステータスの全鍵を返す。
+	FindAllByStatus(ctx context.Context, status string) ([]model.SignKey, error)
+	// UpdateStatus は指定 kid のステータスを更新する。
+	UpdateStatus(ctx context.Context, kid string, status string) error
 }
 
 // SessionRevoker はセッションの一括失効操作を定義する。

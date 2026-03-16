@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +18,9 @@ type Config struct {
 	WebAuthnRPID      string
 	WebAuthnRPName    string
 	WebAuthnRPOrigins []string
+	// 署名鍵自動ローテーション設定
+	KeyRotationIntervalDays int // ローテーション間隔（日）。デフォルト 90 日
+	KeyGracePeriodDays      int // passive 鍵の猶予期間（日）。デフォルト 7 日
 }
 
 func Load() (*Config, error) {
@@ -72,9 +76,25 @@ func Load() (*Config, error) {
 
 	cfg.WebAuthnRPOrigins = []string{strings.TrimRight(cfg.FrontendBaseURL, "/")}
 
+	// 署名鍵ローテーション設定（省略時はデフォルト値）
+	cfg.KeyRotationIntervalDays = parseIntEnv("OP_KEY_ROTATION_INTERVAL_DAYS", 90)
+	cfg.KeyGracePeriodDays = parseIntEnv("OP_KEY_GRACE_PERIOD_DAYS", 7)
+
 	return cfg, nil
 }
 
 func (c *Config) IsSecure() bool {
 	return strings.HasPrefix(c.BaseURL, "https://")
+}
+
+func parseIntEnv(key string, defaultVal int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultVal
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return defaultVal
+	}
+	return n
 }

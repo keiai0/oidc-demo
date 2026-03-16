@@ -2,9 +2,12 @@ package auth
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/audit"
 )
 
 // MFATOTPVerifyHandler は POST /internal/mfa/totp/verify を処理する。
@@ -12,11 +15,13 @@ import (
 type MFATOTPVerifyHandler struct {
 	mfaSvc  *MFATOTPService
 	authSvc *AuthService
+	audit   *audit.AuditLogger
+	logger  *slog.Logger
 }
 
 // NewMFATOTPVerifyHandler は MFATOTPVerifyHandler を生成する。
-func NewMFATOTPVerifyHandler(mfaSvc *MFATOTPService, authSvc *AuthService) *MFATOTPVerifyHandler {
-	return &MFATOTPVerifyHandler{mfaSvc: mfaSvc, authSvc: authSvc}
+func NewMFATOTPVerifyHandler(mfaSvc *MFATOTPService, authSvc *AuthService, auditLog *audit.AuditLogger, logger *slog.Logger) *MFATOTPVerifyHandler {
+	return &MFATOTPVerifyHandler{mfaSvc: mfaSvc, authSvc: authSvc, audit: auditLog, logger: logger}
 }
 
 type verifyRequest struct {
@@ -46,6 +51,9 @@ func (h *MFATOTPVerifyHandler) Handle(c echo.Context) error {
 	// TOTP 検証 → セッション更新
 	if err := h.mfaSvc.VerifyLogin(ctx, session, req.Code); err != nil {
 		if errors.Is(err, ErrInvalidTOTPCode) {
+			h.audit.LogEvent(ctx, audit.EventMFAFailure,
+				audit.UserAttr(session.UserID.String()), audit.IPAttr(c.RealIP()), audit.MethodAttr("totp"), audit.ResultAttr("invalid_code"),
+			)
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid_code", "error_description": "TOTP code is invalid"})
 		}
 		if errors.Is(err, ErrMFANotPending) {
@@ -54,9 +62,13 @@ func (h *MFATOTPVerifyHandler) Handle(c echo.Context) error {
 		if errors.Is(err, ErrMFANotConfigured) {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "mfa_not_configured"})
 		}
-		c.Logger().Errorf("TOTP verify error: %v", err)
+		h.logger.ErrorContext(ctx, "TOTP verify error", "error", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
 	}
+
+	h.audit.LogEvent(ctx, audit.EventMFASuccess,
+		audit.UserAttr(session.UserID.String()), audit.IPAttr(c.RealIP()), audit.MethodAttr("totp"), audit.ResultAttr("success"),
+	)
 
 	resp := map[string]interface{}{"success": true}
 	if req.RedirectAfterMFA != "" {

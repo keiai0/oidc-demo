@@ -2,21 +2,26 @@ package auth
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/audit"
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/metrics"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/model"
 )
 
 type LoginHandler struct {
 	authSvc  *AuthService
+	audit    *audit.AuditLogger
+	logger   *slog.Logger
 	isSecure bool
 }
 
-func NewLoginHandler(authSvc *AuthService, isSecure bool) *LoginHandler {
-	return &LoginHandler{authSvc: authSvc, isSecure: isSecure}
+func NewLoginHandler(authSvc *AuthService, auditLog *audit.AuditLogger, logger *slog.Logger, isSecure bool) *LoginHandler {
+	return &LoginHandler{authSvc: authSvc, audit: auditLog, logger: logger, isSecure: isSecure}
 }
 
 type loginRequest struct {
@@ -51,17 +56,32 @@ func (h *LoginHandler) Handle(c echo.Context) error {
 		}
 	}
 
-	output, err := h.authSvc.Login(c.Request().Context(), input)
+	ctx := c.Request().Context()
+	output, err := h.authSvc.Login(ctx, input)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
+			h.audit.LogEvent(ctx, audit.EventLoginFailure,
+				audit.IPAttr(c.RealIP()), audit.TenantAttr(req.TenantCode), audit.ResultAttr("invalid_credentials"),
+			)
+			metrics.LoginTotal.WithLabelValues("failure").Inc()
 			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid_credentials"})
 		}
 		if errors.Is(err, ErrAccountLocked) {
+			h.audit.LogEvent(ctx, audit.EventLoginLocked,
+				audit.IPAttr(c.RealIP()), audit.TenantAttr(req.TenantCode), audit.ResultAttr("account_locked"),
+			)
+			metrics.LoginTotal.WithLabelValues("locked").Inc()
 			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "account_locked", "error_description": "account is temporarily locked due to too many failed login attempts"})
 		}
-		c.Logger().Errorf("login error: %v", err)
+		h.logger.ErrorContext(ctx, "login error", "error", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
 	}
+
+	h.audit.LogEvent(ctx, audit.EventLoginSuccess,
+		audit.UserAttr(output.User.ID.String()), audit.IPAttr(c.RealIP()), audit.TenantAttr(req.TenantCode), audit.ResultAttr("success"),
+	)
+	metrics.LoginTotal.WithLabelValues("success").Inc()
+	metrics.ActiveSessions.Inc()
 
 	// セッションクッキーを設定
 	cookie := &http.Cookie{

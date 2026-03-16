@@ -2,10 +2,14 @@ package auth
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/audit"
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/metrics"
 )
 
 // SessionRevoker はセッションの失効操作を定義する。
@@ -24,6 +28,7 @@ type InternalLogoutHandler struct {
 	sessionRevoker       SessionRevoker
 	accessTokenRevoker   TokenRevokerBySession
 	refreshTokenRevoker  TokenRevokerBySession
+	audit                *audit.AuditLogger
 	isSecure             bool
 }
 
@@ -32,12 +37,14 @@ func NewInternalLogoutHandler(
 	sessionRevoker SessionRevoker,
 	accessTokenRevoker TokenRevokerBySession,
 	refreshTokenRevoker TokenRevokerBySession,
+	auditLog *audit.AuditLogger,
 	isSecure bool,
 ) *InternalLogoutHandler {
 	return &InternalLogoutHandler{
 		sessionRevoker:      sessionRevoker,
 		accessTokenRevoker:  accessTokenRevoker,
 		refreshTokenRevoker: refreshTokenRevoker,
+		audit:               auditLog,
 		isSecure:            isSecure,
 	}
 }
@@ -63,6 +70,12 @@ func (h *InternalLogoutHandler) Handle(c echo.Context) error {
 	_ = h.sessionRevoker.Revoke(ctx, sessionID)
 	_ = h.accessTokenRevoker.RevokeBySessionID(ctx, sessionID)
 	_ = h.refreshTokenRevoker.RevokeBySessionID(ctx, sessionID)
+
+	h.audit.LogEvent(ctx, audit.EventSessionDestroyed,
+		audit.IPAttr(c.RealIP()),
+		slog.String("session_id", sessionID.String()),
+	)
+	metrics.ActiveSessions.Dec()
 
 	h.clearSessionCookie(c)
 

@@ -44,11 +44,12 @@ func (s *KeyService) EnsureSigningKey(ctx context.Context) error {
 	return err
 }
 
-// RotateKey は新しい署名鍵を生成・保存し、既存の有効な鍵を全て無効化する。
+// RotateKey は新しい署名鍵を生成・保存し、既存の active 鍵を passive（検証専用）に変更する。
+// passive 鍵は猶予期間中も JWKS に含まれ、既存トークンの検証に使用される。
 func (s *KeyService) RotateKey(ctx context.Context) (*model.SignKey, error) {
-	// 既存のアクティブ鍵を全て無効化
-	if err := s.signKeyRepo.DeactivateAllActive(ctx); err != nil {
-		return nil, fmt.Errorf("failed to deactivate existing keys: %w", err)
+	// 既存の active 鍵を passive に変更（即削除せず猶予期間を設ける）
+	if err := s.signKeyRepo.UpdateStatusBulk(ctx, model.SignKeyStatusActive, model.SignKeyStatusPassive); err != nil {
+		return nil, fmt.Errorf("failed to set existing keys to passive: %w", err)
 	}
 
 	// 新しい鍵を生成・保存
@@ -58,6 +59,28 @@ func (s *KeyService) RotateKey(ctx context.Context) (*model.SignKey, error) {
 	}
 
 	return newKey, nil
+}
+
+// ExpirePassiveKeys は rotatedAt から gracePeriod を超過した passive 鍵を expired に変更する。
+func (s *KeyService) ExpirePassiveKeys(ctx context.Context, gracePeriod time.Duration) error {
+	keys, err := s.signKeyRepo.FindAllByStatus(ctx, model.SignKeyStatusPassive)
+	if err != nil {
+		return fmt.Errorf("failed to find passive keys: %w", err)
+	}
+	threshold := time.Now().Add(-gracePeriod)
+	for _, k := range keys {
+		if k.RotatedAt != nil && k.RotatedAt.Before(threshold) {
+			if err := s.signKeyRepo.UpdateStatus(ctx, k.KID, model.SignKeyStatusExpired); err != nil {
+				return fmt.Errorf("failed to expire key %s: %w", k.KID, err)
+			}
+		}
+	}
+	return nil
+}
+
+// DeleteExpiredKeys は expired 状態の鍵を DB から削除する。
+func (s *KeyService) DeleteExpiredKeys(ctx context.Context) error {
+	return s.signKeyRepo.DeleteByStatus(ctx, model.SignKeyStatusExpired)
 }
 
 // generateAndSaveKey は RSA 2048 ビット鍵ペアを生成し、秘密鍵を暗号化して永続化する。
@@ -99,7 +122,7 @@ func (s *KeyService) generateAndSaveKey(ctx context.Context) (*model.SignKey, er
 		Algorithm:     "RS256",
 		PublicKey:     pubPEM,
 		PrivateKeyRef: encryptedPriv,
-		Active:        true,
+		Status:        model.SignKeyStatusActive,
 	}
 
 	if err := s.signKeyRepo.Create(ctx, signKey); err != nil {
@@ -136,11 +159,23 @@ func (s *KeyService) GetActiveSigningKey(ctx context.Context) (string, crypto.Pr
 	return key.KID, privateKey, nil
 }
 
+// HasActiveKey はアクティブな署名鍵が存在するかを返す。Readiness Probe 用。
+func (s *KeyService) HasActiveKey(ctx context.Context) bool {
+	key, err := s.signKeyRepo.FindActive(ctx)
+	return err == nil && key != nil
+}
+
 func (s *KeyService) GetJWKSet(ctx context.Context) (jwk.Set, error) {
-	keys, err := s.signKeyRepo.FindAllActive(ctx)
+	// active + passive 両方を返す。passive 鍵は猶予期間中も既存トークンの検証に必要。
+	active, err := s.signKeyRepo.FindAllByStatus(ctx, model.SignKeyStatusActive)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find active keys: %w", err)
 	}
+	passive, err := s.signKeyRepo.FindAllByStatus(ctx, model.SignKeyStatusPassive)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find passive keys: %w", err)
+	}
+	keys := append(active, passive...)
 
 	set := jwk.NewSet()
 	for _, k := range keys {

@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/hex"
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -14,33 +18,45 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	gowebauthn "github.com/go-webauthn/webauthn/webauthn"
 
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/audit"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/auth"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/crypto"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/database"
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/health"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/jwt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/metrics"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/management"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/oidc"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/store"
 )
 
 func main() {
+	// 構造化ログ初期化（JSON 形式、stdout 出力）
+	slogLogger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	slog.SetDefault(slogLogger)
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
+	// 監査ロガー初期化
+	auditLog := audit.New(slogLogger)
+
 	// マイグレーション実行
 	if err := database.RunMigrations(cfg.DSN, "db/migrations"); err != nil {
 		log.Fatalf("migration failed: %v", err)
 	}
-	log.Println("migrations completed successfully")
+	slogLogger.Info("migrations completed successfully")
 
 	// GORM 初期化
 	db, err := database.NewDB(cfg.DSN)
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
 	}
-	log.Println("database connected successfully")
+	slogLogger.Info("database connected successfully")
 
 	// Store 初期化
 	tenantRepo := store.NewTenantRepository(db)
@@ -68,7 +84,7 @@ func main() {
 	if err := keySvc.EnsureSigningKey(context.Background()); err != nil {
 		log.Fatalf("failed to ensure signing key: %v", err)
 	}
-	log.Println("signing key ensured")
+	slogLogger.Info("signing key ensured")
 
 	tokenSvc := jwt.NewTokenService(keySvc)
 
@@ -129,19 +145,19 @@ func main() {
 	)
 
 	// Auth ハンドラ初期化
-	loginHandler := auth.NewLoginHandler(authSvc, cfg.IsSecure())
+	loginHandler := auth.NewLoginHandler(authSvc, auditLog, slogLogger, cfg.IsSecure())
 	meHandler := auth.NewMeHandler(authSvc, userRepo)
 	passwordChangeHandler := auth.NewPasswordChangeHandler(passwordSvc, authSvc, cfg.IsSecure())
 	consentHandler := auth.NewConsentHandler(authSvc, userConsentRepo)
 	mfaSetupHandler := auth.NewMFATOTPSetupHandler(mfaTOTPSvc, authSvc, userRepo)
 	mfaVerifySetupHandler := auth.NewMFATOTPVerifySetupHandler(mfaTOTPSvc, authSvc)
-	mfaVerifyHandler := auth.NewMFATOTPVerifyHandler(mfaTOTPSvc, authSvc)
+	mfaVerifyHandler := auth.NewMFATOTPVerifyHandler(mfaTOTPSvc, authSvc, auditLog, slogLogger)
 
 	// WebAuthn ハンドラ初期化
 	webauthnRegBeginHandler := auth.NewMFAWebAuthnRegisterBeginHandler(mfaWebAuthnSvc, authSvc, userRepo)
 	webauthnRegCompleteHandler := auth.NewMFAWebAuthnRegisterCompleteHandler(mfaWebAuthnSvc, authSvc)
 	webauthnAuthBeginHandler := auth.NewMFAWebAuthnAuthBeginHandler(mfaWebAuthnSvc, authSvc)
-	webauthnAuthCompleteHandler := auth.NewMFAWebAuthnAuthCompleteHandler(mfaWebAuthnSvc, authSvc)
+	webauthnAuthCompleteHandler := auth.NewMFAWebAuthnAuthCompleteHandler(mfaWebAuthnSvc, authSvc, auditLog, slogLogger)
 	webauthnCredsHandler := auth.NewMFAWebAuthnCredentialsHandler(mfaWebAuthnSvc, authSvc)
 	resetRequestHandler := auth.NewPasswordResetRequestHandler(passwordResetSvc)
 	resetHandler := auth.NewPasswordResetHandler(passwordResetSvc)
@@ -170,10 +186,11 @@ func main() {
 		crypto.VerifyPassword, crypto.VerifyCodeChallenge,
 		jwt.ComputeATHash, jwt.SHA256Hex,
 		dpopJTIRepo,
+		auditLog, slogLogger,
 		cfg.BaseURL,
 	)
 	userInfoHandler := oidc.NewUserInfoHandler(tokenSvc, userRepo, accessTokenRepo, dpopJTIRepo, cfg.BaseURL)
-	revokeHandler := oidc.NewRevokeHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, crypto.VerifyPassword, jwt.SHA256Hex)
+	revokeHandler := oidc.NewRevokeHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, crypto.VerifyPassword, jwt.SHA256Hex, auditLog)
 	introspectHandler := oidc.NewIntrospectHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, userRepo, crypto.VerifyPassword, jwt.SHA256Hex)
 
 	// SLO (Single Logout) ハンドラ初期化
@@ -187,13 +204,14 @@ func main() {
 		backChannelClient, cfg.IsSecure(),
 	)
 	internalLogoutHandler := auth.NewInternalLogoutHandler(
-		sessionRepo, accessTokenRepo, refreshTokenRepo, cfg.IsSecure(),
+		sessionRepo, accessTokenRepo, refreshTokenRepo, auditLog, cfg.IsSecure(),
 	)
 
 	e := echo.New()
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.Use(metrics.HTTPMetricsMiddleware())
 
 	// セキュリティヘッダー（全レスポンス）
 	e.Use(oidc.SecurityHeadersMiddleware(cfg.IsSecure()))
@@ -211,6 +229,19 @@ func main() {
 	e.GET("/healthz", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
+
+	// Liveness / Readiness Probe
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("failed to get sql.DB: %v", err)
+	}
+	livenessHandler := health.NewLivenessHandler()
+	readinessHandler := health.NewReadinessHandler(sqlDB, keySvc)
+	e.GET("/health", livenessHandler.Handle)
+	e.GET("/ready", readinessHandler.Handle)
+
+	// Prometheus メトリクス
+	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	// OIDC エンドポイント
 	e.GET("/jwks", jwksHandler.Handle)
@@ -247,7 +278,7 @@ func main() {
 
 	// Admin auth サービス初期化
 	adminAuthSvc := management.NewAdminAuthService(adminUserRepo, adminSessionRepo, crypto.VerifyPassword)
-	adminAuthHandler := management.NewAdminAuthHandler(adminAuthSvc, adminUserRepo, cfg.IsSecure())
+	adminAuthHandler := management.NewAdminAuthHandler(adminAuthSvc, adminUserRepo, auditLog, slogLogger, cfg.IsSecure())
 
 	// Management auth エンドポイント (認証不要)
 	e.POST("/management/v1/auth/login", adminAuthHandler.HandleLogin)
@@ -291,5 +322,24 @@ func main() {
 	mgmtGroup.POST("/incidents/revoke-user-tokens", incidentHandler.HandleRevokeUser)
 	mgmtGroup.POST("/users/:user_id/unlock", incidentHandler.HandleUnlockUser)
 
-	e.Logger.Fatal(e.Start(":" + cfg.Port))
+	// 署名鍵自動ローテーション scheduler 起動
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer cancel()
+
+	rotationScheduler := jwt.NewRotationScheduler(keySvc, auditLog, slogLogger, cfg.KeyRotationIntervalDays, cfg.KeyGracePeriodDays)
+	go rotationScheduler.Run(ctx)
+
+	// graceful shutdown: ctx がキャンセルされたらサーバーをシャットダウン
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+		if err := e.Shutdown(shutdownCtx); err != nil {
+			slogLogger.Error("server shutdown error", "error", err)
+		}
+	}()
+
+	if err := e.Start(":" + cfg.Port); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("server error: %v", err)
+	}
 }

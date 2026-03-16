@@ -2,9 +2,13 @@ package oidc
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/audit"
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/metrics"
 )
 
 type TokenHandler struct {
@@ -20,6 +24,8 @@ type TokenHandler struct {
 	computeATHash       ComputeATHashFunc
 	sha256Hex           SHA256HexFunc
 	dpopJTIStore        DPoPJTIStore
+	audit               *audit.AuditLogger
+	logger              *slog.Logger
 	issuerBaseURL       string
 }
 
@@ -36,6 +42,8 @@ func NewTokenHandler(
 	computeATHash ComputeATHashFunc,
 	sha256Hex SHA256HexFunc,
 	dpopJTIStore DPoPJTIStore,
+	auditLog *audit.AuditLogger,
+	logger *slog.Logger,
 	issuerBaseURL string,
 ) *TokenHandler {
 	return &TokenHandler{
@@ -51,6 +59,8 @@ func NewTokenHandler(
 		computeATHash:       computeATHash,
 		sha256Hex:           sha256Hex,
 		dpopJTIStore:        dpopJTIStore,
+		audit:               auditLog,
+		logger:              logger,
 		issuerBaseURL:       issuerBaseURL,
 	}
 }
@@ -119,9 +129,14 @@ func (h *TokenHandler) handleAuthCodeGrant(c echo.Context, dpopJKT string) error
 		if errors.Is(err, ErrInvalidGrant) {
 			return tokenError(c, http.StatusBadRequest, "invalid_grant", "")
 		}
-		c.Logger().Errorf("token error: %v", err)
+		h.logger.ErrorContext(c.Request().Context(), "token error", "error", err)
 		return tokenError(c, http.StatusInternalServerError, "server_error", "")
 	}
+
+	h.audit.LogEvent(c.Request().Context(), audit.EventTokenIssued,
+		audit.ClientAttr(clientID), audit.GrantTypeAttr("authorization_code"), audit.ResultAttr("success"),
+	)
+	metrics.TokenIssuedTotal.WithLabelValues("authorization_code").Inc()
 
 	return c.JSON(http.StatusOK, resp)
 }
@@ -156,9 +171,14 @@ func (h *TokenHandler) handleRefreshTokenGrant(c echo.Context, dpopJKT string) e
 		if errors.Is(err, ErrUnsupportedGrantType) {
 			return tokenError(c, http.StatusBadRequest, "unsupported_grant_type", "")
 		}
-		c.Logger().Errorf("refresh token error: %v", err)
+		h.logger.ErrorContext(c.Request().Context(), "refresh token error", "error", err)
 		return tokenError(c, http.StatusInternalServerError, "server_error", "")
 	}
+
+	h.audit.LogEvent(c.Request().Context(), audit.EventTokenIssued,
+		audit.ClientAttr(clientID), audit.GrantTypeAttr("refresh_token"), audit.ResultAttr("success"),
+	)
+	metrics.TokenIssuedTotal.WithLabelValues("refresh_token").Inc()
 
 	return c.JSON(http.StatusOK, resp)
 }

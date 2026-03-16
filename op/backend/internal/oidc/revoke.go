@@ -5,6 +5,9 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/audit"
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/metrics"
 )
 
 type RevokeHandler struct {
@@ -14,6 +17,7 @@ type RevokeHandler struct {
 	tokenValidator    TokenValidator
 	verifyPassword    VerifyPasswordFunc
 	sha256Hex         SHA256HexFunc
+	audit             *audit.AuditLogger
 }
 
 func NewRevokeHandler(
@@ -23,6 +27,7 @@ func NewRevokeHandler(
 	tokenValidator TokenValidator,
 	verifyPassword VerifyPasswordFunc,
 	sha256Hex SHA256HexFunc,
+	auditLog *audit.AuditLogger,
 ) *RevokeHandler {
 	return &RevokeHandler{
 		clientFinder:      clientFinder,
@@ -31,6 +36,7 @@ func NewRevokeHandler(
 		tokenValidator:    tokenValidator,
 		verifyPassword:    verifyPassword,
 		sha256Hex:         sha256Hex,
+		audit:             auditLog,
 	}
 }
 
@@ -75,6 +81,11 @@ func (h *RevokeHandler) Handle(c echo.Context) error {
 			h.revokeRefreshToken(ctx, token)
 		}
 	}
+
+	h.audit.LogEvent(ctx, audit.EventTokenRevoked,
+		audit.ClientAttr(clientID), audit.ResultAttr("success"),
+	)
+	metrics.TokenRevokedTotal.Inc()
 
 	// RFC 7009 Section 2.2: 存在しないトークンでも 200 OK (MUST)
 	return c.NoContent(http.StatusOK)

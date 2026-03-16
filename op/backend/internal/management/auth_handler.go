@@ -2,10 +2,13 @@ package management
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/audit"
 )
 
 const adminCookieName = "op_admin_session"
@@ -14,14 +17,18 @@ const adminCookieName = "op_admin_session"
 type AdminAuthHandler struct {
 	authSvc    *AdminAuthService
 	userFinder AdminUserFinder
+	audit      *audit.AuditLogger
+	logger     *slog.Logger
 	isSecure   bool
 }
 
 // NewAdminAuthHandler は AdminAuthHandler を生成する。
-func NewAdminAuthHandler(authSvc *AdminAuthService, userFinder AdminUserFinder, isSecure bool) *AdminAuthHandler {
+func NewAdminAuthHandler(authSvc *AdminAuthService, userFinder AdminUserFinder, auditLog *audit.AuditLogger, logger *slog.Logger, isSecure bool) *AdminAuthHandler {
 	return &AdminAuthHandler{
 		authSvc:    authSvc,
 		userFinder: userFinder,
+		audit:      auditLog,
+		logger:     logger,
 		isSecure:   isSecure,
 	}
 }
@@ -49,11 +56,18 @@ func (h *AdminAuthHandler) HandleLogin(c echo.Context) error {
 	)
 	if err != nil {
 		if errors.Is(err, ErrAdminInvalidCredentials) {
+			h.audit.LogEvent(c.Request().Context(), audit.EventAdminLoginFailure,
+				audit.IPAttr(c.RealIP()), audit.ResultAttr("invalid_credentials"),
+			)
 			return errorJSON(c, http.StatusUnauthorized, "invalid_credentials", "login ID or password is incorrect")
 		}
-		c.Logger().Errorf("admin login error: %v", err)
+		h.logger.ErrorContext(c.Request().Context(), "admin login error", "error", err)
 		return serverError(c)
 	}
+
+	h.audit.LogEvent(c.Request().Context(), audit.EventAdminLogin,
+		audit.IPAttr(c.RealIP()), audit.ResultAttr("success"),
+	)
 
 	cookie := &http.Cookie{
 		Name:     adminCookieName,
