@@ -21,6 +21,10 @@ type Config struct {
 	// 署名鍵自動ローテーション設定
 	KeyRotationIntervalDays int // ローテーション間隔（日）。デフォルト 90 日
 	KeyGracePeriodDays      int // passive 鍵の猶予期間（日）。デフォルト 7 日
+	// SMTP メール送信設定（未設定の場合はスタブ送信）
+	SMTPHost string
+	SMTPPort string // デフォルト 1025
+	SMTPFrom string // デフォルト noreply@oidc-demo.local
 }
 
 func Load() (*Config, error) {
@@ -79,6 +83,17 @@ func Load() (*Config, error) {
 	// 署名鍵ローテーション設定（省略時はデフォルト値）
 	cfg.KeyRotationIntervalDays = parseIntEnv("OP_KEY_ROTATION_INTERVAL_DAYS", 90)
 	cfg.KeyGracePeriodDays = parseIntEnv("OP_KEY_GRACE_PERIOD_DAYS", 7)
+
+	// SMTP 設定（省略時はスタブ送信）
+	cfg.SMTPHost = os.Getenv("OP_SMTP_HOST")
+	cfg.SMTPPort = os.Getenv("OP_SMTP_PORT")
+	if cfg.SMTPPort == "" {
+		cfg.SMTPPort = "1025"
+	}
+	cfg.SMTPFrom = os.Getenv("OP_SMTP_FROM")
+	if cfg.SMTPFrom == "" {
+		cfg.SMTPFrom = "noreply@oidc-demo.local"
+	}
 
 	return cfg, nil
 }

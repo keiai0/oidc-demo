@@ -102,7 +102,14 @@ func main() {
 
 	// パスワードリセット関連の初期化
 	resetTokenRepo := store.NewPasswordResetTokenRepository(db)
-	emailSender := auth.NewStubEmailSender()
+	var emailSender auth.EmailSender
+	if cfg.SMTPHost != "" {
+		emailSender = auth.NewSMTPEmailSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPFrom, cfg.FrontendBaseURL)
+		slogLogger.Info("email sender: SMTP", "host", cfg.SMTPHost, "port", cfg.SMTPPort)
+	} else {
+		emailSender = auth.NewStubEmailSender()
+		slogLogger.Info("email sender: stub (set OP_SMTP_HOST to enable SMTP)")
+	}
 	passwordResetSvc := auth.NewPasswordResetService(tenantRepo, userRepo, resetTokenRepo, passwordSvc, userRepo, emailSender)
 
 	// Consent 関連の初期化
@@ -161,6 +168,22 @@ func main() {
 	webauthnCredsHandler := auth.NewMFAWebAuthnCredentialsHandler(mfaWebAuthnSvc, authSvc)
 	resetRequestHandler := auth.NewPasswordResetRequestHandler(passwordResetSvc)
 	resetHandler := auth.NewPasswordResetHandler(passwordResetSvc)
+
+	// Phase 10: メールアドレス変更 関連の初期化
+	emailChangeTokenRepo := store.NewEmailChangeTokenRepository(db)
+	emailChangeSvc := auth.NewEmailChangeService(emailChangeTokenRepo, userRepo, emailSender)
+	emailChangeHandler := auth.NewEmailChangeHandler(emailChangeSvc, authSvc)
+
+	// Phase 10: バックアップコード 関連の初期化
+	backupCodeRepo := store.NewBackupCodeRepository(db)
+	backupCodeSvc := auth.NewBackupCodeService(backupCodeRepo, sessionRepo, crypto.HashPassword, crypto.VerifyPassword)
+	backupCodeHandler := auth.NewMFABackupCodeHandler(backupCodeSvc, authSvc)
+
+	// Phase 10: TOTP 無効化ハンドラ
+	mfaTOTPDisableHandler := auth.NewMFATOTPDisableHandler(mfaTOTPSvc, authSvc, userRepo, crypto.VerifyPassword)
+
+	// Phase 10: セッション一覧・失効ハンドラ
+	sessionListHandler := auth.NewSessionListHandler(sessionRepo, sessionRepo, sessionRepo, authSvc)
 
 	// パスキーログインサービス & ハンドラ初期化
 	passkeyLoginSvc := auth.NewPasskeyLoginService(
@@ -275,6 +298,15 @@ func main() {
 	e.POST("/internal/mfa/webauthn/authenticate/complete", webauthnAuthCompleteHandler.Handle)
 	e.GET("/internal/mfa/webauthn/credentials", webauthnCredsHandler.HandleList)
 	e.DELETE("/internal/mfa/webauthn/credentials/:id", webauthnCredsHandler.HandleDelete)
+
+	// Phase 10: ユーザーセルフサービス
+	e.POST("/internal/email/change-request", emailChangeHandler.HandleRequest)
+	e.POST("/internal/email/verify", emailChangeHandler.HandleVerify)
+	e.DELETE("/internal/mfa/totp", mfaTOTPDisableHandler.Handle)
+	e.POST("/internal/mfa/backup-codes/generate", backupCodeHandler.HandleGenerate)
+	e.POST("/internal/mfa/backup-codes/verify", backupCodeHandler.HandleVerify)
+	e.GET("/internal/sessions", sessionListHandler.HandleList)
+	e.DELETE("/internal/sessions/:id", sessionListHandler.HandleRevoke)
 
 	// Admin auth サービス初期化
 	adminAuthSvc := management.NewAdminAuthService(adminUserRepo, adminSessionRepo, crypto.VerifyPassword)
