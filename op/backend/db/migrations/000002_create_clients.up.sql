@@ -12,6 +12,10 @@ CREATE TABLE IF NOT EXISTS clients (
     status                      VARCHAR(31) NOT NULL DEFAULT 'active',
     refresh_token_lifetime      INT,
     refresh_token_idle_timeout  INT,
+    subject_type                VARCHAR(31) NOT NULL DEFAULT 'public',
+    sector_identifier_uri       VARCHAR(2048),
+    pairwise_salt               VARCHAR(255),
+    userinfo_signed_response_alg VARCHAR(31),
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -29,3 +33,7 @@ COMMENT ON COLUMN clients.backchannel_logout_uri IS 'Back-Channel Logout 通知�
 COMMENT ON COLUMN clients.refresh_token_lifetime IS 'クライアント固有のリフレッシュトークン絶対有効期限(秒)。NULLの場合はテナント設定に従う';
 COMMENT ON COLUMN clients.refresh_token_idle_timeout IS 'リフレッシュトークンのアイドルタイムアウト(秒)。NULLの場合はスライディング有効期限なし';
 COMMENT ON COLUMN clients.status IS 'active / disabled';
+COMMENT ON COLUMN clients.subject_type IS 'sub の種別: public（デフォルト）または pairwise (OIDC Core Section 8)';
+COMMENT ON COLUMN clients.sector_identifier_uri IS 'Pairwise sub の sector 識別子 URI。NULLの場合は redirect_uri のホスト部を使用';
+COMMENT ON COLUMN clients.pairwise_salt IS 'Pairwise sub 計算用のクライアント固有ソルト。subject_type=pairwise 時に自動生成';
+COMMENT ON COLUMN clients.userinfo_signed_response_alg IS 'Userinfo レスポンスの署名アルゴリズム。NULLの場合は JSON (OIDC Core Section 5.3.2)';

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS authorization_codes (
     nonce                   VARCHAR(255),
     code_challenge          VARCHAR(255),
     code_challenge_method   VARCHAR(31),
+    claims_param            TEXT,
     expires_at              TIMESTAMPTZ NOT NULL,
     used_at                 TIMESTAMPTZ
 );
@@ -21,4 +22,5 @@ COMMENT ON COLUMN authorization_codes.scope IS '要求されたスコープ';
 COMMENT ON COLUMN authorization_codes.nonce IS 'OIDC nonce。IDトークンのリプレイ攻撃防止';
 COMMENT ON COLUMN authorization_codes.code_challenge IS 'PKCE code_challenge';
 COMMENT ON COLUMN authorization_codes.code_challenge_method IS 'PKCE メソッド（S256のみ）';
+COMMENT ON COLUMN authorization_codes.claims_param IS 'OIDC claims リクエストパラメータ (Section 5.5)。JSON 文字列';
 COMMENT ON COLUMN authorization_codes.used_at IS '使用済み日時。null=未使用。再利用は MUST 拒否';
