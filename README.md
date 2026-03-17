@@ -34,14 +34,21 @@ docker compose --profile all up -d
 
 ### DB管理
 
-マイグレーションはサーバー起動時にも自動実行されるが、手動でも実行できる。
+**OP Backend** のマイグレーションはサーバー起動時に自動実行される。手動実行も可能。
 
 ```bash
-# マイグレーション実行
+# OP マイグレーション手動実行
 docker compose exec op-backend go run cmd/migrate/main.go
 
 # 開発用シードデータ投入
 docker compose exec op-backend go run cmd/seed/main.go
+```
+
+**RP** のマイグレーション（Drizzle）は `rp-migrate` サービスが起動時に自動実行する。手動実行も可能。
+
+```bash
+# RP マイグレーション手動実行
+docker compose exec rp pnpm db:migrate
 ```
 
 ## ポート
