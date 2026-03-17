@@ -7,14 +7,15 @@ import (
 )
 
 type AccessToken struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	JTI       string     `gorm:"type:varchar(255);uniqueIndex;not null"`
-	SessionID uuid.UUID  `gorm:"type:uuid;not null"`
-	ClientID  uuid.UUID  `gorm:"type:uuid;not null"`
-	Scope     string     `gorm:"type:varchar(1024);not null"`
-	DPoPJKT   *string    `gorm:"type:varchar(255);column:dpop_jkt"`
-	ExpiresAt time.Time  `gorm:"not null"`
-	RevokedAt *time.Time
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	JTI         string     `gorm:"type:varchar(255);uniqueIndex;not null"`
+	SessionID   *uuid.UUID `gorm:"type:uuid"`
+	ClientID    uuid.UUID  `gorm:"type:uuid;not null"`
+	Scope       string     `gorm:"type:varchar(1024);not null"`
+	DPoPJKT     *string    `gorm:"type:varchar(255);column:dpop_jkt"`
+	ClaimsParam *string    `gorm:"type:text"`
+	ExpiresAt   time.Time  `gorm:"not null"`
+	RevokedAt   *time.Time
 
 	Session Session `gorm:"foreignKey:SessionID"`
 	Client  Client  `gorm:"foreignKey:ClientID"`

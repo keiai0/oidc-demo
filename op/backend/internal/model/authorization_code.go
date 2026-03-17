@@ -16,6 +16,7 @@ type AuthorizationCode struct {
 	Nonce               *string    `gorm:"type:varchar(255)"`
 	CodeChallenge       *string    `gorm:"type:varchar(255)"`
 	CodeChallengeMethod *string    `gorm:"type:varchar(31)"`
+	ClaimsParam         *string    `gorm:"type:text"`
 	ExpiresAt           time.Time  `gorm:"not null"`
 	UsedAt              *time.Time
 

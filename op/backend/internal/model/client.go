@@ -39,11 +39,15 @@ type Client struct {
 	RequirePKCE             bool        `gorm:"not null;default:true"`
 	RefreshTokenLifetime    *int        `gorm:"type:int"`
 	RefreshTokenIdleTimeout *int        `gorm:"type:int"`
-	FrontchannelLogoutURI   *string     `gorm:"type:varchar(2048)"`
-	BackchannelLogoutURI    *string     `gorm:"type:varchar(2048)"`
-	Status                  string      `gorm:"type:varchar(31);not null;default:'active'"`
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	FrontchannelLogoutURI     *string     `gorm:"type:varchar(2048)"`
+	BackchannelLogoutURI      *string     `gorm:"type:varchar(2048)"`
+	Status                    string      `gorm:"type:varchar(31);not null;default:'active'"`
+	SubjectType               string      `gorm:"type:varchar(31);not null;default:'public'"`
+	SectorIdentifierURI       *string     `gorm:"type:varchar(2048)"`
+	PairwiseSalt              *string     `gorm:"type:varchar(255)"`
+	UserinfoSignedResponseAlg *string     `gorm:"type:varchar(31)"`
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 
 	RedirectURIs          []RedirectURI           `gorm:"foreignKey:ClientDBID"`
 	PostLogoutRedirectURIs []PostLogoutRedirectURI `gorm:"foreignKey:ClientDBID"`
