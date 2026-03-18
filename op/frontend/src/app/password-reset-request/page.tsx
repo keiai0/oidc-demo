@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect } from "react";
 import { Alert } from "@/components/ui/alert";
 
 const API_URL = process.env.NEXT_PUBLIC_OP_BACKEND_BASE_URL || "http://localhost:8080";
@@ -17,7 +17,7 @@ export default function PasswordResetRequestPage() {
     setTenantCode(params.get("tenant_code") || "demo");
   }, []);
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -73,6 +73,10 @@ export default function PasswordResetRequestPage() {
         <p className="text-sm text-gray-600 mb-4">
           登録済みのメールアドレスを入力してください。リセット用のリンクを送信します。
         </p>
+        <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200 text-xs text-gray-500">
+          <p className="font-medium text-gray-600 mb-1">テスト用アカウント</p>
+          <p>メールアドレス: <code className="bg-gray-100 px-1 rounded">testuser@example.com</code></p>
+        </div>
         {error && <Alert variant="error">{error}</Alert>}
         <form onSubmit={handleSubmit}>
           <div className="mb-4">

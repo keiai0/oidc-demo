@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect } from "react";
 import { Alert } from "@/components/ui/alert";
 
 const API_URL =
@@ -58,7 +58,7 @@ export default function MfaSetupPage() {
     }
   }
 
-  async function handleVerify(e: FormEvent) {
+  async function handleVerify(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);

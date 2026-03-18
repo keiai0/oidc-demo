@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect } from "react";
 import { Alert } from "@/components/ui/alert";
 import {
   prepareRequestOptions,
@@ -28,7 +28,7 @@ export default function LoginPage() {
     if (redirectTo || redirectAfterLogin) {
       window.location.href = `${API_URL}${redirectTo || redirectAfterLogin}`;
     } else {
-      window.location.href = "/";
+      window.location.href = "/account";
     }
   }
 
@@ -119,7 +119,7 @@ export default function LoginPage() {
   }
 
   // パスワードでログイン
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -207,6 +207,7 @@ export default function LoginPage() {
           <p className="font-medium text-gray-600 mb-1">テスト用アカウント</p>
           <p>ログインID: <code className="bg-gray-100 px-1 rounded">testuser</code></p>
           <p>パスワード: <code className="bg-gray-100 px-1 rounded">password</code></p>
+          <p>メール: <code className="bg-gray-100 px-1 rounded">testuser@example.com</code></p>
         </div>
 
         {/* パスキーでログイン */}
