@@ -23,3 +23,12 @@ func generateClientSecret() (string, error) {
 	}
 	return hex.EncodeToString(b), nil
 }
+
+// generatePairwiseSalt generates a random salt for pairwise subject identifier (64 hex chars = 32 bytes).
+func generatePairwiseSalt() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate pairwise salt: %w", err)
+	}
+	return hex.EncodeToString(b), nil
+}

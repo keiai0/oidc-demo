@@ -205,14 +205,14 @@ func main() {
 	parHandler := oidc.NewPARHandler(clientRepo, tenantRepo, tenantClientRepo, parRepo, crypto.VerifyPassword)
 	tokenHandler := oidc.NewTokenHandler(
 		authCodeRepo, accessTokenRepo, refreshTokenRepo, idTokenRepo,
-		clientRepo, tenantRepo, tokenSvc,
+		clientRepo, tenantRepo, tenantClientRepo, userRepo, tokenSvc,
 		crypto.VerifyPassword, crypto.VerifyCodeChallenge,
 		jwt.ComputeATHash, jwt.SHA256Hex,
 		dpopJTIRepo,
 		auditLog, slogLogger,
 		cfg.BaseURL,
 	)
-	userInfoHandler := oidc.NewUserInfoHandler(tokenSvc, userRepo, accessTokenRepo, dpopJTIRepo, cfg.BaseURL)
+	userInfoHandler := oidc.NewUserInfoHandler(tokenSvc, userRepo, clientRepo, accessTokenRepo, dpopJTIRepo, tokenSvc, cfg.BaseURL)
 	revokeHandler := oidc.NewRevokeHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, crypto.VerifyPassword, jwt.SHA256Hex, auditLog)
 	introspectHandler := oidc.NewIntrospectHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, userRepo, crypto.VerifyPassword, jwt.SHA256Hex)
 

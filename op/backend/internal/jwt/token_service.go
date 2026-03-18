@@ -59,6 +59,11 @@ func (s *TokenService) SignIDToken(ctx context.Context, claims *model.IDTokenCla
 		builder = builder.Claim("sid", claims.SessionID)
 	}
 
+	// claims リクエストパラメータで要求された追加クレーム (OIDC Core Section 5.5)
+	for k, v := range claims.ExtraClaims {
+		builder = builder.Claim(k, v)
+	}
+
 	token, err := builder.Build()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to build ID token: %w", err)
@@ -91,8 +96,12 @@ func (s *TokenService) SignAccessToken(ctx context.Context, claims *model.Access
 		IssuedAt(now).
 		Expiration(now.Add(lifetime)).
 		JwtID(jti).
-		Claim("scope", claims.Scope).
-		Claim("sid", claims.SessionID)
+		Claim("scope", claims.Scope)
+
+	// sid クレーム: client_credentials grant ではセッションがないためスキップ
+	if claims.SessionID != "" {
+		builder = builder.Claim("sid", claims.SessionID)
+	}
 
 	// DPoP: cnf クレーム (RFC 9449 Section 6.1)
 	if claims.Confirmation != nil {
@@ -151,14 +160,14 @@ func (s *TokenService) ValidateAccessToken(ctx context.Context, tokenString stri
 		clientID = aud[0]
 	}
 
-	subUUID, err := uuid.Parse(sub)
-	if err != nil {
-		return nil, fmt.Errorf("invalid subject in access token: %w", err)
-	}
-
-	sessionUUID, err := uuid.Parse(sid)
-	if err != nil {
-		return nil, fmt.Errorf("invalid session id in access token: %w", err)
+	// sid は client_credentials grant では存在しない
+	var sessionID *uuid.UUID
+	if sid != "" {
+		sessionUUID, err := uuid.Parse(sid)
+		if err != nil {
+			return nil, fmt.Errorf("invalid session id in access token: %w", err)
+		}
+		sessionID = &sessionUUID
 	}
 
 	// DPoP: cnf.jkt を抽出 (RFC 9449 Section 6.1)
@@ -172,12 +181,50 @@ func (s *TokenService) ValidateAccessToken(ctx context.Context, tokenString stri
 
 	return &model.AccessTokenResult{
 		JTI:       jti,
-		Subject:   subUUID,
+		Subject:   sub,
 		ClientID:  clientID,
 		Scope:     scope,
-		SessionID: sessionUUID,
+		SessionID: sessionID,
 		DPoPJKT:   dpopJKT,
 	}, nil
+}
+
+// SignUserInfoResponse は userinfo レスポンスを署名付き JWT として返す。
+// 仕様参照: OIDC Core 1.0 Section 5.3.2
+func (s *TokenService) SignUserInfoResponse(ctx context.Context, claims map[string]interface{}) (string, error) {
+	kid, privKey, err := s.keySvc.GetActiveSigningKey(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get signing key: %w", err)
+	}
+
+	builder := jwt.NewBuilder()
+	for k, v := range claims {
+		switch k {
+		case "iss":
+			builder = builder.Issuer(v.(string))
+		case "aud":
+			builder = builder.Audience([]string{v.(string)})
+		case "sub":
+			builder = builder.Subject(v.(string))
+		default:
+			builder = builder.Claim(k, v)
+		}
+	}
+
+	token, err := builder.Build()
+	if err != nil {
+		return "", fmt.Errorf("failed to build userinfo JWT: %w", err)
+	}
+
+	hdrs := jws.NewHeaders()
+	_ = hdrs.Set(jws.KeyIDKey, kid)
+
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.RS256(), privKey, jws.WithProtectedHeaders(hdrs)))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign userinfo JWT: %w", err)
+	}
+
+	return string(signed), nil
 }
 
 // ComputeATHash は at_hash を計算する (OIDC Core 1.0 Section 3.1.3.6)

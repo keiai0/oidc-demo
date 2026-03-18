@@ -51,41 +51,59 @@ func NewClientHandler(
 	}
 }
 
+var validSubjectTypes = map[string]bool{
+	"public":   true,
+	"pairwise": true,
+}
+
+var validUserinfoSignedAlgs = map[string]bool{
+	"RS256": true,
+}
+
 type createClientRequest struct {
-	Name                    string   `json:"name"`
-	GrantTypes              []string `json:"grant_types"`
-	ResponseTypes           []string `json:"response_types"`
-	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
-	RequirePKCE             *bool    `json:"require_pkce,omitempty"`
-	RedirectURIs            []string `json:"redirect_uris,omitempty"`
-	PostLogoutRedirectURIs  []string `json:"post_logout_redirect_uris,omitempty"`
-	FrontchannelLogoutURI   *string  `json:"frontchannel_logout_uri,omitempty"`
-	BackchannelLogoutURI    *string  `json:"backchannel_logout_uri,omitempty"`
+	Name                      string   `json:"name"`
+	GrantTypes                []string `json:"grant_types"`
+	ResponseTypes             []string `json:"response_types"`
+	TokenEndpointAuthMethod   string   `json:"token_endpoint_auth_method"`
+	RequirePKCE               *bool    `json:"require_pkce,omitempty"`
+	RedirectURIs              []string `json:"redirect_uris,omitempty"`
+	PostLogoutRedirectURIs    []string `json:"post_logout_redirect_uris,omitempty"`
+	FrontchannelLogoutURI     *string  `json:"frontchannel_logout_uri,omitempty"`
+	BackchannelLogoutURI      *string  `json:"backchannel_logout_uri,omitempty"`
+	SubjectType               string   `json:"subject_type,omitempty"`
+	SectorIdentifierURI       *string  `json:"sector_identifier_uri,omitempty"`
+	UserinfoSignedResponseAlg *string  `json:"userinfo_signed_response_alg,omitempty"`
 }
 
 type updateClientRequest struct {
-	Name                    *string  `json:"name,omitempty"`
-	GrantTypes              []string `json:"grant_types,omitempty"`
-	ResponseTypes           []string `json:"response_types,omitempty"`
-	TokenEndpointAuthMethod *string  `json:"token_endpoint_auth_method,omitempty"`
-	RequirePKCE             *bool    `json:"require_pkce,omitempty"`
-	FrontchannelLogoutURI   *string  `json:"frontchannel_logout_uri,omitempty"`
-	BackchannelLogoutURI    *string  `json:"backchannel_logout_uri,omitempty"`
+	Name                      *string  `json:"name,omitempty"`
+	GrantTypes                []string `json:"grant_types,omitempty"`
+	ResponseTypes             []string `json:"response_types,omitempty"`
+	TokenEndpointAuthMethod   *string  `json:"token_endpoint_auth_method,omitempty"`
+	RequirePKCE               *bool    `json:"require_pkce,omitempty"`
+	FrontchannelLogoutURI     *string  `json:"frontchannel_logout_uri,omitempty"`
+	BackchannelLogoutURI      *string  `json:"backchannel_logout_uri,omitempty"`
+	SubjectType               *string  `json:"subject_type,omitempty"`
+	SectorIdentifierURI       *string  `json:"sector_identifier_uri,omitempty"`
+	UserinfoSignedResponseAlg *string  `json:"userinfo_signed_response_alg,omitempty"`
 }
 
 type clientResponse struct {
-	ID                      string   `json:"id"`
-	ClientID                string   `json:"client_id"`
-	Name                    string   `json:"name"`
-	GrantTypes              []string `json:"grant_types"`
-	ResponseTypes           []string `json:"response_types"`
-	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
-	RequirePKCE             bool     `json:"require_pkce"`
-	FrontchannelLogoutURI   *string  `json:"frontchannel_logout_uri,omitempty"`
-	BackchannelLogoutURI    *string  `json:"backchannel_logout_uri,omitempty"`
-	Status                  string   `json:"status"`
-	CreatedAt               string   `json:"created_at"`
-	UpdatedAt               string   `json:"updated_at"`
+	ID                        string   `json:"id"`
+	ClientID                  string   `json:"client_id"`
+	Name                      string   `json:"name"`
+	GrantTypes                []string `json:"grant_types"`
+	ResponseTypes             []string `json:"response_types"`
+	TokenEndpointAuthMethod   string   `json:"token_endpoint_auth_method"`
+	RequirePKCE               bool     `json:"require_pkce"`
+	FrontchannelLogoutURI     *string  `json:"frontchannel_logout_uri,omitempty"`
+	BackchannelLogoutURI      *string  `json:"backchannel_logout_uri,omitempty"`
+	SubjectType               string   `json:"subject_type"`
+	SectorIdentifierURI       *string  `json:"sector_identifier_uri,omitempty"`
+	UserinfoSignedResponseAlg *string  `json:"userinfo_signed_response_alg,omitempty"`
+	Status                    string   `json:"status"`
+	CreatedAt                 string   `json:"created_at"`
+	UpdatedAt                 string   `json:"updated_at"`
 }
 
 type clientCreateResponse struct {
@@ -95,18 +113,21 @@ type clientCreateResponse struct {
 
 func toClientResponse(c *model.Client) clientResponse {
 	return clientResponse{
-		ID:                      c.ID.String(),
-		ClientID:                c.ClientID,
-		Name:                    c.Name,
-		GrantTypes:              []string(c.GrantTypes),
-		ResponseTypes:           []string(c.ResponseTypes),
-		TokenEndpointAuthMethod: c.TokenEndpointAuthMethod,
-		RequirePKCE:             c.RequirePKCE,
-		FrontchannelLogoutURI:   c.FrontchannelLogoutURI,
-		BackchannelLogoutURI:    c.BackchannelLogoutURI,
-		Status:                  c.Status,
-		CreatedAt:               c.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:               c.UpdatedAt.Format(time.RFC3339),
+		ID:                        c.ID.String(),
+		ClientID:                  c.ClientID,
+		Name:                      c.Name,
+		GrantTypes:                []string(c.GrantTypes),
+		ResponseTypes:             []string(c.ResponseTypes),
+		TokenEndpointAuthMethod:   c.TokenEndpointAuthMethod,
+		RequirePKCE:               c.RequirePKCE,
+		FrontchannelLogoutURI:     c.FrontchannelLogoutURI,
+		BackchannelLogoutURI:      c.BackchannelLogoutURI,
+		SubjectType:               c.SubjectType,
+		SectorIdentifierURI:       c.SectorIdentifierURI,
+		UserinfoSignedResponseAlg: c.UserinfoSignedResponseAlg,
+		Status:                    c.Status,
+		CreatedAt:                 c.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:                 c.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
@@ -226,17 +247,48 @@ func (h *ClientHandler) HandleCreate(c echo.Context) error {
 		requirePKCE = *req.RequirePKCE
 	}
 
+	// subject_type バリデーション (OIDC Core Section 8)
+	subjectType := "public"
+	if req.SubjectType != "" {
+		if !validSubjectTypes[req.SubjectType] {
+			return badRequest(c, "subject_type must be 'public' or 'pairwise'")
+		}
+		subjectType = req.SubjectType
+	}
+
+	// userinfo_signed_response_alg バリデーション (OIDC Core Section 5.3.2)
+	if req.UserinfoSignedResponseAlg != nil && *req.UserinfoSignedResponseAlg != "" {
+		if !validUserinfoSignedAlgs[*req.UserinfoSignedResponseAlg] {
+			return badRequest(c, "unsupported userinfo_signed_response_alg (supported: RS256)")
+		}
+	}
+
+	// Pairwise: ソルト自動生成
+	var pairwiseSalt *string
+	if subjectType == "pairwise" {
+		salt, err := generatePairwiseSalt()
+		if err != nil {
+			c.Logger().Errorf("failed to generate pairwise salt: %v", err)
+			return serverError(c)
+		}
+		pairwiseSalt = &salt
+	}
+
 	client := &model.Client{
-		ClientID:                clientID,
-		ClientSecretHash:        secretHash,
-		Name:                    req.Name,
-		GrantTypes:              model.StringSlice(req.GrantTypes),
-		ResponseTypes:           model.StringSlice(req.ResponseTypes),
-		TokenEndpointAuthMethod: req.TokenEndpointAuthMethod,
-		RequirePKCE:             requirePKCE,
-		FrontchannelLogoutURI:   req.FrontchannelLogoutURI,
-		BackchannelLogoutURI:    req.BackchannelLogoutURI,
-		Status:                  "active",
+		ClientID:                  clientID,
+		ClientSecretHash:          secretHash,
+		Name:                      req.Name,
+		GrantTypes:                model.StringSlice(req.GrantTypes),
+		ResponseTypes:             model.StringSlice(req.ResponseTypes),
+		TokenEndpointAuthMethod:   req.TokenEndpointAuthMethod,
+		RequirePKCE:               requirePKCE,
+		FrontchannelLogoutURI:     req.FrontchannelLogoutURI,
+		BackchannelLogoutURI:      req.BackchannelLogoutURI,
+		SubjectType:               subjectType,
+		SectorIdentifierURI:       req.SectorIdentifierURI,
+		PairwiseSalt:              pairwiseSalt,
+		UserinfoSignedResponseAlg: req.UserinfoSignedResponseAlg,
+		Status:                    "active",
 	}
 
 	// Redirect URI を関連として設定
@@ -379,6 +431,30 @@ func (h *ClientHandler) HandleUpdate(c echo.Context) error {
 	}
 	if req.BackchannelLogoutURI != nil {
 		client.BackchannelLogoutURI = req.BackchannelLogoutURI
+	}
+	if req.SubjectType != nil {
+		if !validSubjectTypes[*req.SubjectType] {
+			return badRequest(c, "subject_type must be 'public' or 'pairwise'")
+		}
+		client.SubjectType = *req.SubjectType
+		// pairwise に変更された場合、ソルトが未設定なら自動生成
+		if *req.SubjectType == "pairwise" && client.PairwiseSalt == nil {
+			salt, err := generatePairwiseSalt()
+			if err != nil {
+				c.Logger().Errorf("failed to generate pairwise salt: %v", err)
+				return serverError(c)
+			}
+			client.PairwiseSalt = &salt
+		}
+	}
+	if req.SectorIdentifierURI != nil {
+		client.SectorIdentifierURI = req.SectorIdentifierURI
+	}
+	if req.UserinfoSignedResponseAlg != nil {
+		if *req.UserinfoSignedResponseAlg != "" && !validUserinfoSignedAlgs[*req.UserinfoSignedResponseAlg] {
+			return badRequest(c, "unsupported userinfo_signed_response_alg (supported: RS256)")
+		}
+		client.UserinfoSignedResponseAlg = req.UserinfoSignedResponseAlg
 	}
 
 	if err := h.clientStore.Update(ctx, client); err != nil {
