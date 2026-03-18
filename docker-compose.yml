@@ -1,5 +1,15 @@
 services:
   # ===========================================================================
+  # MailHog (開発用メールサーバー)
+  # ===========================================================================
+  mailhog:
+    image: axllent/mailpit:latest
+    profiles: [op, all]
+    ports:
+      - "${MAILHOG_SMTP_PORT}:1025"
+      - "${MAILHOG_UI_PORT}:8025"
+
+  # ===========================================================================
   # PostgreSQL
   # ===========================================================================
   postgres:
@@ -36,6 +46,9 @@ services:
       OP_BACKEND_BASE_URL: ${OP_BACKEND_BASE_URL}
       OP_KEY_ENCRYPTION_KEY: ${OP_KEY_ENCRYPTION_KEY}
       OP_FRONTEND_BASE_URL: ${OP_FRONTEND_BASE_URL}
+      OP_SMTP_HOST: ${OP_SMTP_HOST:-mailhog}
+      OP_SMTP_PORT: ${MAILHOG_SMTP_PORT}
+      OP_SMTP_FROM: ${OP_SMTP_FROM:-noreply@oidc-demo.local}
     ports:
       - "${OP_BACKEND_PORT}:8080"
     volumes:
@@ -45,6 +58,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mailhog:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
       interval: 10s
@@ -69,6 +84,24 @@ services:
       - ./op/frontend/public:/app/public
 
   # ===========================================================================
+  # RP DB マイグレーション（起動時1回のみ実行）
+  # ===========================================================================
+  rp-migrate:
+    build:
+      context: ./rp
+      target: dev
+    profiles: [rp, all]
+    environment:
+      RP_DATABASE_URL: ${RP_DATABASE_URL}
+    command: pnpm db:migrate
+    volumes:
+      - ./rp/drizzle:/app/drizzle
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ===========================================================================
   # RP (Next.js dev server)
   # ===========================================================================
   rp:
@@ -78,6 +111,7 @@ services:
     profiles: [rp, all]
     environment:
       RP_DATABASE_URL: ${RP_DATABASE_URL}
+      RP_OP_FRONTEND_URL: ${RP_OP_FRONTEND_URL}
       RP_OIDC_ISSUER: ${RP_OIDC_ISSUER}
       RP_OIDC_ISSUER_INTERNAL: ${RP_OIDC_ISSUER_INTERNAL}
       RP_OIDC_CLIENT_ID: ${RP_OIDC_CLIENT_ID}
@@ -96,6 +130,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      rp-migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

@@ -42,7 +42,15 @@ export default async function DashboardPage() {
             認証済み — {user.name ?? user.email ?? user.opSub}
           </p>
         </div>
-        <LogoutButton />
+        <div className="flex items-center gap-3">
+          <a
+            href={`${process.env.RP_OP_FRONTEND_URL ?? "http://localhost:3000"}/account`}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            アカウント設定
+          </a>
+          <LogoutButton />
+        </div>
       </div>
 
       <div className="space-y-6">
