@@ -40,6 +40,9 @@ export const clientsApi = {
       post_logout_redirect_uris?: string[];
       frontchannel_logout_uri?: string;
       backchannel_logout_uri?: string;
+      subject_type?: string;
+      sector_identifier_uri?: string;
+      userinfo_signed_response_alg?: string;
     },
   ) {
     return managementFetch<ClientCreateResponse>(
@@ -58,6 +61,9 @@ export const clientsApi = {
       require_pkce?: boolean;
       frontchannel_logout_uri?: string;
       backchannel_logout_uri?: string;
+      subject_type?: string;
+      sector_identifier_uri?: string;
+      userinfo_signed_response_alg?: string;
     },
   ) {
     return managementFetch<Client>(`/management/v1/clients/${clientDbId}`, {

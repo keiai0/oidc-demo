@@ -23,6 +23,10 @@ export default function ClientDetailPage() {
   const [newPostLogoutURI, setNewPostLogoutURI] = useState("");
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const [selectedTenantId, setSelectedTenantId] = useState("");
+  const [editingOidc, setEditingOidc] = useState(false);
+  const [subjectType, setSubjectType] = useState("");
+  const [sectorIdentifierUri, setSectorIdentifierUri] = useState("");
+  const [userinfoSignedAlg, setUserinfoSignedAlg] = useState("");
 
   const { data: client, isLoading } = useQuery({
     queryKey: queryKeys.clients.detail(id),
@@ -122,6 +126,30 @@ export default function ClientDetailPage() {
     onError: (err) => setError(getErrorMessage(err)),
   });
 
+  const updateOidcMutation = useMutation({
+    mutationFn: () =>
+      clientsApi.update(id, {
+        subject_type: subjectType,
+        sector_identifier_uri: sectorIdentifierUri || undefined,
+        userinfo_signed_response_alg: userinfoSignedAlg || undefined,
+      }),
+    onSuccess: () => {
+      setError("");
+      setEditingOidc(false);
+      invalidateClient();
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  const startEditOidc = () => {
+    if (client) {
+      setSubjectType(client.subject_type ?? "public");
+      setSectorIdentifierUri(client.sector_identifier_uri ?? "");
+      setUserinfoSignedAlg(client.userinfo_signed_response_alg ?? "");
+    }
+    setEditingOidc(true);
+  };
+
   const handleRotateSecret = () => {
     if (!confirm("現在のシークレットは無効になります。よろしいですか？"))
       return;
@@ -181,6 +209,91 @@ export default function ClientDetailPage() {
             </Fragment>
           ))}
         </dl>
+      </Card>
+
+      {/* OIDC Settings */}
+      <Card
+        title="OIDC 設定"
+        titleAction={
+          !editingOidc ? (
+            <button
+              onClick={startEditOidc}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              編集
+            </button>
+          ) : undefined
+        }
+        className="mb-4"
+      >
+        {editingOidc ? (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Subject Type (OIDC Core Section 8)
+              </label>
+              <select
+                value={subjectType}
+                onChange={(e) => setSubjectType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="public">public（デフォルト）</option>
+                <option value="pairwise">pairwise（RP ごとに異なる sub）</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sector Identifier URI
+              </label>
+              <input
+                value={sectorIdentifierUri}
+                onChange={(e) => setSectorIdentifierUri(e.target.value)}
+                placeholder="https://example.com（空の場合は redirect_uri のホストを使用）"
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                pairwise sub の計算に使用する sector 識別子。空の場合はリダイレクト URI のホスト部を使用します。
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Userinfo 署名アルゴリズム (OIDC Core Section 5.3.2)
+              </label>
+              <select
+                value={userinfoSignedAlg}
+                onChange={(e) => setUserinfoSignedAlg(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">なし（JSON レスポンス）</option>
+                <option value="RS256">RS256（署名付き JWT レスポンス）</option>
+              </select>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => updateOidcMutation.mutate()}
+                disabled={updateOidcMutation.isPending}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {updateOidcMutation.isPending ? "保存中..." : "保存"}
+              </button>
+              <button
+                onClick={() => setEditingOidc(false)}
+                className="px-4 py-2 border border-gray-300 text-sm rounded text-gray-700 hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        ) : (
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <dt className="text-gray-500">Subject Type</dt>
+            <dd>{client.subject_type ?? "public"}</dd>
+            <dt className="text-gray-500">Sector Identifier URI</dt>
+            <dd className="font-mono text-xs">{client.sector_identifier_uri || "（未設定）"}</dd>
+            <dt className="text-gray-500">Userinfo 署名</dt>
+            <dd>{client.userinfo_signed_response_alg || "なし（JSON）"}</dd>
+          </dl>
+        )}
       </Card>
 
       {/* Tenant Associations */}

@@ -19,6 +19,9 @@ export default function NewClientPage() {
   const [name, setName] = useState("");
   const [authMethod, setAuthMethod] = useState("client_secret_basic");
   const [requirePkce, setRequirePkce] = useState(true);
+  const [subjectType, setSubjectType] = useState("public");
+  const [sectorIdentifierUri, setSectorIdentifierUri] = useState("");
+  const [userinfoSignedAlg, setUserinfoSignedAlg] = useState("");
   const [redirectURIs, setRedirectURIs] = useState<string[]>([""]);
   const [postLogoutRedirectURIs, setPostLogoutRedirectURIs] = useState<string[]>([""]);
   const [created, setCreated] = useState<ClientCreateResponse | null>(null);
@@ -33,6 +36,9 @@ export default function NewClientPage() {
         require_pkce: requirePkce,
         redirect_uris: redirectURIs.filter((u) => u.trim() !== ""),
         post_logout_redirect_uris: postLogoutRedirectURIs.filter((u) => u.trim() !== ""),
+        subject_type: subjectType,
+        sector_identifier_uri: sectorIdentifierUri || undefined,
+        userinfo_signed_response_alg: userinfoSignedAlg || undefined,
       }),
     onSuccess: (data) => setCreated(data),
   });
@@ -141,6 +147,48 @@ export default function NewClientPage() {
           <label htmlFor="require_pkce" className="text-sm text-gray-700">
             PKCE 必須
           </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Subject Type
+          </label>
+          <select
+            value={subjectType}
+            onChange={(e) => setSubjectType(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="public">public（デフォルト）</option>
+            <option value="pairwise">pairwise（RP ごとに異なる sub）</option>
+          </select>
+        </div>
+
+        {subjectType === "pairwise" && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sector Identifier URI
+            </label>
+            <input
+              value={sectorIdentifierUri}
+              onChange={(e) => setSectorIdentifierUri(e.target.value)}
+              placeholder="https://example.com（空の場合は redirect_uri のホストを使用）"
+              className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Userinfo 署名アルゴリズム
+          </label>
+          <select
+            value={userinfoSignedAlg}
+            onChange={(e) => setUserinfoSignedAlg(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">なし（JSON レスポンス）</option>
+            <option value="RS256">RS256（署名付き JWT）</option>
+          </select>
         </div>
 
         <URIListField

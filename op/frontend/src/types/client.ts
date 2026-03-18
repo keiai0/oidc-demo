@@ -16,6 +16,9 @@ export type Client = {
   require_pkce: boolean;
   frontchannel_logout_uri?: string;
   backchannel_logout_uri?: string;
+  subject_type: string;
+  sector_identifier_uri?: string;
+  userinfo_signed_response_alg?: string;
   status: string;
   created_at: string;
   updated_at: string;
