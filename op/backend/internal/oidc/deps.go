@@ -121,6 +121,11 @@ type PARStore interface {
 	MarkAsUsed(ctx context.Context, id uuid.UUID) error
 }
 
+// UserinfoJWTSigner は userinfo レスポンスを署名付き JWT として返す (OIDC Core Section 5.3.2)。
+type UserinfoJWTSigner interface {
+	SignUserInfoResponse(ctx context.Context, claims map[string]interface{}) (string, error)
+}
+
 type (
 	VerifyPasswordFunc      func(password, hash string) (bool, error)
 	VerifyCodeChallengeFunc func(verifier, challenge string) bool

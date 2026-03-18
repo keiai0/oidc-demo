@@ -66,7 +66,7 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 
 	// PAR (RFC 9126): request_uri パラメータの処理
 	requestURI := c.QueryParam("request_uri")
-	var responseType, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod, prompt, maxAgeStr, acrValuesStr string
+	var responseType, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod, prompt, maxAgeStr, acrValuesStr, claimsParam string
 
 	if requestURI != "" {
 		// request_uri が指定されている場合、他のパラメータは client_id 以外禁止 (RFC 9126 Section 4)
@@ -114,6 +114,7 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		prompt = params["prompt"]
 		maxAgeStr = params["max_age"]
 		acrValuesStr = params["acr_values"]
+		claimsParam = params["claims"]
 
 		// PAR 解決後: リクエスト URL を通常パラメータに書き換える。
 		// ログイン後のリダイレクト先（redirect_after_login）が request_uri ではなく
@@ -138,6 +139,7 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		prompt = c.QueryParam("prompt")
 		maxAgeStr = c.QueryParam("max_age")
 		acrValuesStr = c.QueryParam("acr_values")
+		claimsParam = c.QueryParam("claims")
 	}
 
 	// prompt パラメータ解析・検証 (OIDC Core 1.0 Section 3.1.2.1)
@@ -296,6 +298,13 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		return h.redirectToConsent(c, tenantCode, client.ID.String(), client.Name, scope)
 	}
 
+	// claims パラメータの検証 (OIDC Core 1.0 Section 5.5)
+	if claimsParam != "" {
+		if _, err := ParseClaimsRequest(claimsParam); err != nil {
+			return errorRedirect(c, redirectURI, state, "invalid_request", "invalid claims parameter")
+		}
+	}
+
 	// 認可コード発行
 	codeBytes := make([]byte, 32)
 	if _, err := rand.Read(codeBytes); err != nil {
@@ -315,6 +324,10 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 	if codeChallengeMethod != "" {
 		methodPtr = &codeChallengeMethod
 	}
+	var claimsParamPtr *string
+	if claimsParam != "" {
+		claimsParamPtr = &claimsParam
+	}
 
 	authCode := &model.AuthorizationCode{
 		SessionID:           session.ID,
@@ -325,6 +338,7 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		Nonce:               noncePtr,
 		CodeChallenge:       challengePtr,
 		CodeChallengeMethod: methodPtr,
+		ClaimsParam:         claimsParamPtr,
 		ExpiresAt:           time.Now().Add(time.Duration(tenant.AuthCodeLifetime) * time.Second),
 	}
 

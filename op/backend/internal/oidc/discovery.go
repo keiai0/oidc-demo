@@ -45,8 +45,8 @@ func (h *DiscoveryHandler) Handle(c echo.Context) error {
 		"pushed_authorization_request_endpoint":            issuer + "/par",
 		"require_pushed_authorization_requests":            false,
 		"response_types_supported":              []string{"code"},
-		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
-		"subject_types_supported":               []string{"public"},
+		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "client_credentials"},
+		"subject_types_supported":               []string{"public", "pairwise"},
 		"id_token_signing_alg_values_supported": []string{"RS256"},
 		"scopes_supported":                      []string{"openid", "profile", "email", "offline_access"},
 		"token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"},
@@ -58,7 +58,9 @@ func (h *DiscoveryHandler) Handle(c echo.Context) error {
 		"backchannel_logout_session_supported":    true,
 		"acr_values_supported":                  []string{"urn:mace:incommon:iap:bronze"},
 		"dpop_signing_alg_values_supported":                []string{"RS256", "ES256"},
-		"claims_supported":                                 []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "acr", "amr", "sid", "name", "email", "email_verified"},
+		"userinfo_signing_alg_values_supported":            []string{"RS256"},
+		"claims_parameter_supported":                       true,
+		"claims_supported":                                 []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "acr", "amr", "sid", "name", "email", "email_verified", "updated_at"},
 	}
 
 	c.Response().Header().Set("Cache-Control", "public, max-age=86400")

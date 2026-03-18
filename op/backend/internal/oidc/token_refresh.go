@@ -20,8 +20,8 @@ type RefreshTokenGrantInput struct {
 // handleRefreshTokenGrantLogic はリフレッシュトークングラントのビジネスロジック。
 // Refresh Token Rotation + Reuse Detection (RFC 9700) を実装。
 func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *RefreshTokenGrantInput) (*TokenResponse, error) {
-	// クライアント認証
-	client, err := h.clientFinder.FindByClientID(ctx, input.ClientID)
+	// クライアント認証（Pairwise sub の sector identifier 解決のため redirect_uri もロード）
+	client, err := h.clientFinder.FindByClientIDWithRedirectURIs(ctx, input.ClientID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find client: %w", err)
 	}
@@ -87,7 +87,8 @@ func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *
 	}
 
 	issuer := h.issuerBaseURL + "/" + tenant.Code
-	userID := rt.Session.UserID.String()
+	// Pairwise Subject Identifier (OIDC Core Section 8)
+	userID := ResolveSubject(client, rt.Session.UserID.String())
 
 	// スコープ: リクエストのscopeが指定されていればそれを使う（ただし元のスコープ以下）
 	scope := rt.AccessToken.Scope
@@ -121,7 +122,7 @@ func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *
 
 	accessToken := &model.AccessToken{
 		JTI:       accessJTI,
-		SessionID: rt.SessionID,
+		SessionID: &rt.SessionID,
 		ClientID:  client.ID,
 		Scope:     scope,
 		ExpiresAt: time.Now().Add(accessTokenLifetime),

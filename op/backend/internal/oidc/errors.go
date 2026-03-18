@@ -6,6 +6,7 @@ var (
 	ErrInvalidClient        = errors.New("invalid_client")
 	ErrInvalidGrant         = errors.New("invalid_grant")
 	ErrUnsupportedGrantType = errors.New("unsupported_grant_type")
+	ErrInvalidScope         = errors.New("invalid_scope")
 	ErrInvalidDPoPProof     = errors.New("invalid_dpop_proof")
 	ErrUseDPoPScheme        = errors.New("use_dpop_nonce")
 )

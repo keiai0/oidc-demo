@@ -8,26 +8,32 @@ import (
 )
 
 type UserInfoHandler struct {
-	tokenValidator   TokenValidator
-	userFinder       UserFinder
-	accessTokenStore AccessTokenStore
-	dpopJTIStore     DPoPJTIStore
-	issuerBaseURL    string
+	tokenValidator     TokenValidator
+	userFinder         UserFinder
+	clientFinder       ClientFinder
+	accessTokenStore   AccessTokenStore
+	dpopJTIStore       DPoPJTIStore
+	userinfoJWTSigner  UserinfoJWTSigner
+	issuerBaseURL      string
 }
 
 func NewUserInfoHandler(
 	tokenValidator TokenValidator,
 	userFinder UserFinder,
+	clientFinder ClientFinder,
 	accessTokenStore AccessTokenStore,
 	dpopJTIStore DPoPJTIStore,
+	userinfoJWTSigner UserinfoJWTSigner,
 	issuerBaseURL string,
 ) *UserInfoHandler {
 	return &UserInfoHandler{
-		tokenValidator:   tokenValidator,
-		userFinder:       userFinder,
-		accessTokenStore: accessTokenStore,
-		dpopJTIStore:     dpopJTIStore,
-		issuerBaseURL:    issuerBaseURL,
+		tokenValidator:    tokenValidator,
+		userFinder:        userFinder,
+		clientFinder:      clientFinder,
+		accessTokenStore:  accessTokenStore,
+		dpopJTIStore:      dpopJTIStore,
+		userinfoJWTSigner: userinfoJWTSigner,
+		issuerBaseURL:     issuerBaseURL,
 	}
 }
 
@@ -96,15 +102,28 @@ func (h *UserInfoHandler) Handle(c echo.Context) error {
 		}
 	}
 
-	// ユーザー情報取得
-	user, err := h.userFinder.FindByID(ctx, result.Subject)
+	// ユーザー情報取得（セッション経由: pairwise sub の場合、sub は UUID ではないため）
+	if dbToken.SessionID == nil {
+		// client_credentials grant にはユーザーがないため userinfo は利用不可
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "invalid_token", "error_description": "userinfo is not available for client_credentials tokens"})
+	}
+	user, err := h.userFinder.FindByID(ctx, dbToken.Session.UserID)
 	if err != nil || user == nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
 	}
 
+	// クライアント取得（Pairwise sub / Userinfo JWT 署名に使用）
+	client, err := h.clientFinder.FindByClientIDWithRedirectURIs(ctx, result.ClientID)
+	if err != nil || client == nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+	}
+
+	// Pairwise Subject Identifier (OIDC Core Section 8)
+	sub := ResolveSubject(client, user.ID.String())
+
 	// スコープに応じたクレーム構築
 	claims := map[string]interface{}{
-		"sub": user.ID.String(),
+		"sub": sub,
 	}
 
 	scopes := strings.Split(result.Scope, " ")
@@ -119,6 +138,33 @@ func (h *UserInfoHandler) Handle(c echo.Context) error {
 	if containsScope(scopes, "email") {
 		claims["email"] = user.Email
 		claims["email_verified"] = user.EmailVerified
+	}
+
+	// claims リクエストパラメータで要求された追加クレーム (OIDC Core Section 5.5)
+	if dbToken.ClaimsParam != nil {
+		claimsReq, err := ParseClaimsRequest(*dbToken.ClaimsParam)
+		if err == nil {
+			extraClaims := ResolveUserinfoClaims(claimsReq, user)
+			for k, v := range extraClaims {
+				if _, exists := claims[k]; !exists {
+					claims[k] = v
+				}
+			}
+		}
+	}
+
+	// 署名付き JWT レスポンス (OIDC Core Section 5.3.2)
+	if client.UserinfoSignedResponseAlg != nil && *client.UserinfoSignedResponseAlg != "" {
+		tenantCode := c.Param("tenant_code")
+		claims["iss"] = h.issuerBaseURL + "/" + tenantCode
+		claims["aud"] = client.ClientID
+
+		signedJWT, err := h.userinfoJWTSigner.SignUserInfoResponse(ctx, claims)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
+		}
+		c.Response().Header().Set("Content-Type", "application/jwt")
+		return c.String(http.StatusOK, signedJWT)
 	}
 
 	return c.JSON(http.StatusOK, claims)

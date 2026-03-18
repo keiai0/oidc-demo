@@ -18,6 +18,8 @@ type TokenHandler struct {
 	idTokenCreator      IDTokenCreator
 	clientFinder        ClientFinder
 	tenantFinder        TenantFinder
+	tenantClientChecker TenantClientChecker
+	userFinder          UserFinder
 	tokenSigner         TokenSigner
 	verifyPassword      VerifyPasswordFunc
 	verifyCodeChallenge VerifyCodeChallengeFunc
@@ -36,6 +38,8 @@ func NewTokenHandler(
 	idTokenCreator IDTokenCreator,
 	clientFinder ClientFinder,
 	tenantFinder TenantFinder,
+	tenantClientChecker TenantClientChecker,
+	userFinder UserFinder,
 	tokenSigner TokenSigner,
 	verifyPassword VerifyPasswordFunc,
 	verifyCodeChallenge VerifyCodeChallengeFunc,
@@ -53,6 +57,8 @@ func NewTokenHandler(
 		idTokenCreator:      idTokenCreator,
 		clientFinder:        clientFinder,
 		tenantFinder:        tenantFinder,
+		tenantClientChecker: tenantClientChecker,
+		userFinder:          userFinder,
 		tokenSigner:         tokenSigner,
 		verifyPassword:      verifyPassword,
 		verifyCodeChallenge: verifyCodeChallenge,
@@ -94,6 +100,8 @@ func (h *TokenHandler) Handle(c echo.Context) error {
 		return h.handleAuthCodeGrant(c, dpopJKT)
 	case "refresh_token":
 		return h.handleRefreshTokenGrant(c, dpopJKT)
+	case "client_credentials":
+		return h.handleClientCredentialsGrant(c, dpopJKT)
 	default:
 		return tokenError(c, http.StatusBadRequest, "unsupported_grant_type", "")
 	}

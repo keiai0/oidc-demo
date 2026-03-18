@@ -30,8 +30,8 @@ type TokenResponse struct {
 
 // handleAuthCodeGrantLogic は認可コードグラントのビジネスロジック
 func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *AuthCodeGrantInput) (*TokenResponse, error) {
-	// クライアント認証
-	client, err := h.clientFinder.FindByClientID(ctx, input.ClientID)
+	// クライアント認証（Pairwise sub の sector identifier 解決のため redirect_uri もロード）
+	client, err := h.clientFinder.FindByClientIDWithRedirectURIs(ctx, input.ClientID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find client: %w", err)
 	}
@@ -98,7 +98,18 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 	}
 
 	issuer := h.issuerBaseURL + "/" + tenant.Code
-	userID := authCode.Session.UserID.String()
+	// Pairwise Subject Identifier (OIDC Core Section 8): クライアント設定に応じて sub を変換
+	userID := ResolveSubject(client, authCode.Session.UserID.String())
+
+	// claims リクエストパラメータの解析 (OIDC Core 1.0 Section 5.5)
+	var claimsReq *model.ClaimsRequest
+	if authCode.ClaimsParam != nil {
+		var err error
+		claimsReq, err = ParseClaimsRequest(*authCode.ClaimsParam)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse claims parameter: %w", err)
+		}
+	}
 
 	// アクセストークン生成
 	accessTokenLifetime := time.Duration(tenant.AccessTokenLifetime) * time.Second
@@ -118,13 +129,14 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 		return nil, fmt.Errorf("failed to sign access token: %w", err)
 	}
 
-	// アクセストークンDB保存
+	// アクセストークンDB保存（claims_param を userinfo で使用するためコピー）
 	accessToken := &model.AccessToken{
-		JTI:       accessJTI,
-		SessionID: authCode.SessionID,
-		ClientID:  client.ID,
-		Scope:     authCode.Scope,
-		ExpiresAt: time.Now().Add(accessTokenLifetime),
+		JTI:         accessJTI,
+		SessionID:   &authCode.SessionID,
+		ClientID:    client.ID,
+		Scope:       authCode.Scope,
+		ClaimsParam: authCode.ClaimsParam,
+		ExpiresAt:   time.Now().Add(accessTokenLifetime),
 	}
 	if input.DPoPJKT != "" {
 		accessToken.DPoPJKT = &input.DPoPJKT
@@ -136,16 +148,26 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 	// IDトークン生成 (at_hash 含む)
 	atHash := h.computeATHash(accessTokenStr)
 	idTokenLifetime := time.Duration(tenant.IDTokenLifetime) * time.Second
+
+	// claims パラメータで要求された id_token 向け追加クレームを解決 (OIDC Core Section 5.5)
+	// ユーザー由来のクレーム (name, email 等) も含めてベストエフォートで ID トークンに含める。
+	var user *model.User
+	if claimsReq != nil && claimsReq.IDToken != nil {
+		user, _ = h.userFinder.FindByID(ctx, authCode.Session.UserID)
+	}
+	extraClaims := ResolveIDTokenClaims(claimsReq, user, &authCode.Session)
+
 	idTokenJTI, idTokenStr, err := h.tokenSigner.SignIDToken(ctx, &model.IDTokenClaims{
-		Issuer:    issuer,
-		Subject:   userID,
-		Audience:  client.ClientID,
-		Nonce:     authCode.Nonce,
-		AuthTime:  authCode.Session.AuthTime,
-		ATHash:    atHash,
-		ACR:       authCode.Session.ACR,
-		AMR:       []string(authCode.Session.AMR),
-		SessionID: authCode.SessionID.String(),
+		Issuer:      issuer,
+		Subject:     userID,
+		Audience:    client.ClientID,
+		Nonce:       authCode.Nonce,
+		AuthTime:    authCode.Session.AuthTime,
+		ATHash:      atHash,
+		ACR:         authCode.Session.ACR,
+		AMR:         []string(authCode.Session.AMR),
+		SessionID:   authCode.SessionID.String(),
+		ExtraClaims: extraClaims,
 	}, idTokenLifetime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign ID token: %w", err)

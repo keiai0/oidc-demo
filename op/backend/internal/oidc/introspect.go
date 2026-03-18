@@ -114,7 +114,7 @@ func (h *IntrospectHandler) introspectAccessToken(ctx context.Context, tokenStri
 		"active":     true,
 		"scope":      result.Scope,
 		"client_id":  result.ClientID,
-		"sub":        result.Subject.String(),
+		"sub":        result.Subject,
 		"exp":        dbToken.ExpiresAt.Unix(),
 		"token_type": "Bearer",
 	}
