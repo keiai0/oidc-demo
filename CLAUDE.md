@@ -192,3 +192,16 @@ Hydra・Dex 調査（`docs/research/`）から抽出した、今後の実装で�
 - 実装中に発見した落とし穴やハマりポイントは、このセクションに追記する
 - 同じミスを繰り返さないための具体的な対策を記録する
 - 修正を受けたら「なぜ間違えたか」をパターンとして残す
+
+### AccessTokenResult.Subject は string にすべき（Phase 11）
+- `sub` クレームは UUID とは限らない（pairwise sub = base64url hash、client_credentials = client_id 文字列）
+- `uuid.Parse(sub)` で型変換すると pairwise / client_credentials で失敗する
+- JWT クレームの値はパース後に型を狭めず、必要な箇所で変換する
+
+### マイグレーションファイル編集後は DB リセットが必要
+- golang-migrate は実行済みバージョンをスキップするため、既存ファイルの編集だけでは DB に反映されない
+- 開発中は `DROP SCHEMA op CASCADE` → サーバー再起動 → seed 再投入 の手順が必要
+
+### バックエンド機能追加時はフロントエンド UI も必ず更新する
+- 管理 API に新フィールドを追加したら、管理 UI（OP Frontend）の作成・詳細画面にもフォームを追加する
+- 型定義（types/）、API クライアント（lib/api/）、画面コンポーネントの 3 箇所を更新する
