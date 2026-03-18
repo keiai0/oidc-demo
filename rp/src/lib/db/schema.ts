@@ -35,6 +35,7 @@ export const sessions = rpSchema.table("sessions", {
   idToken: text("id_token").notNull(),
   tokenType: varchar("token_type", { length: 31 }).notNull().default("Bearer"),
   userinfoJson: jsonb("userinfo_json"),
+  claimsRequestJson: jsonb("claims_request_json"),
   tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }).notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),

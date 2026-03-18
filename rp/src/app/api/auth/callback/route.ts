@@ -38,10 +38,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(errorUrl.toString());
   }
 
-  // 一時 Cookie を削除
+  // 一時 Cookie を読み取り・削除
+  const claimsRequestRaw = cookieStore.get("oidc_claims_request")?.value;
   cookieStore.delete("oidc_state");
   cookieStore.delete("oidc_nonce");
   cookieStore.delete("oidc_code_verifier");
+  cookieStore.delete("oidc_claims_request");
 
   try {
     // トークン交換 + ID トークン検証（openid-client が自動検証）
@@ -73,6 +75,16 @@ export async function GET(request: NextRequest) {
     // RP セッション作成
     const sid =
       typeof tokens.claims.sid === "string" ? tokens.claims.sid : undefined;
+    // claims リクエスト JSON をパース（存在すれば）
+    let claimsRequestJson: Record<string, unknown> | undefined;
+    if (claimsRequestRaw) {
+      try {
+        claimsRequestJson = JSON.parse(claimsRequestRaw);
+      } catch {
+        // 無効な JSON は無視
+      }
+    }
+
     const session = await createSession({
       userId: user.id,
       opSessionId: sid,
@@ -81,6 +93,7 @@ export async function GET(request: NextRequest) {
       idToken: tokens.idToken,
       tokenType: tokens.tokenType,
       userinfoJson: userInfo,
+      claimsRequestJson,
       tokenExpiresAt: tokens.expiresAt,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 時間
     });

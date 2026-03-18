@@ -5,8 +5,10 @@ import { introspectToken } from "@/lib/oidc/introspect";
 import { TokenViewer } from "@/components/token-viewer";
 import { UserInfoViewer } from "@/components/userinfo-viewer";
 import { IntrospectionViewer } from "@/components/introspection-viewer";
+import { ClaimsViewer } from "@/components/claims-viewer";
 import { SessionInfo } from "@/components/session-info";
 import { LogoutButton } from "@/components/logout-button";
+import { decodeJwt } from "jose";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,16 @@ export default async function DashboardPage() {
   // UserInfo はコールバック時に取得・保存済みのキャッシュを使用
   // DPoP-bound トークンの場合、ダッシュボードから直接 userinfo API を呼べないため
   const userInfo = (session.userinfoJson as Record<string, unknown>) ?? null;
+
+  // Claims パラメータで要求したクレームの比較表示用
+  const claimsRequest =
+    (session.claimsRequestJson as Record<string, unknown>) ?? null;
+  let idTokenClaims: Record<string, unknown> = {};
+  try {
+    idTokenClaims = decodeJwt(session.idToken) as Record<string, unknown>;
+  } catch {
+    // デコード失敗時は空オブジェクト
+  }
 
   // Token Introspection: サーバーサイドでトークンの有効性をリアルタイム確認
   let introspectionResult: Record<string, unknown> | null = null;
@@ -71,6 +83,12 @@ export default async function DashboardPage() {
         <TokenViewer title="アクセストークン" token={session.accessToken} />
 
         <UserInfoViewer data={userInfo} error={null} />
+
+        <ClaimsViewer
+          claimsRequest={claimsRequest}
+          idTokenClaims={idTokenClaims}
+          userInfo={userInfo}
+        />
 
         <IntrospectionViewer data={introspectionResult} error={introspectionError} />
       </div>

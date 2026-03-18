@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ClaimsConfig } from "@/components/claims-config";
 
 export default function LoginPage() {
   return (
@@ -11,12 +11,7 @@ export default function LoginPage() {
           動作検証用 RP アプリケーション
         </p>
 
-        <Link
-          href="/api/auth/login"
-          className="block w-full py-3 px-4 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          OP でログイン
-        </Link>
+        <ClaimsConfig />
 
         <div className="mt-6 p-3 bg-gray-50 rounded border border-gray-200 text-xs text-gray-500">
           <p className="font-medium text-gray-600 mb-1">テスト用アカウント</p>

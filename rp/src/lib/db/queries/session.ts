@@ -12,6 +12,7 @@ interface CreateSessionParams {
   idToken: string;
   tokenType?: string;
   userinfoJson?: Record<string, unknown>;
+  claimsRequestJson?: Record<string, unknown>;
   tokenExpiresAt: Date;
   expiresAt: Date;
 }
@@ -33,6 +34,7 @@ export async function createSession(params: CreateSessionParams) {
       idToken: params.idToken,
       tokenType: params.tokenType ?? "Bearer",
       userinfoJson: params.userinfoJson ?? null,
+      claimsRequestJson: params.claimsRequestJson ?? null,
       tokenExpiresAt: params.tokenExpiresAt,
       expiresAt: params.expiresAt,
     })

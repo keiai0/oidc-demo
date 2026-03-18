@@ -5,7 +5,9 @@ import { getOIDCConfig, getOIDCEnv } from "./config";
  * 認可リクエストに必要なパラメータを生成し、認可 URL を返す。
  * PAR (RFC 9126) を使用し、認可パラメータをバックチャネルで事前送信する。
  */
-export async function buildLoginUrl(): Promise<{
+export async function buildLoginUrl(options?: {
+  claims?: string;
+}): Promise<{
   url: URL;
   state: string;
   nonce: string;
@@ -19,7 +21,7 @@ export async function buildLoginUrl(): Promise<{
   const state = client.randomState();
   const nonce = client.randomNonce();
 
-  const params = {
+  const params: Record<string, string> = {
     redirect_uri: env.redirectUri,
     scope: "openid profile email",
     state,
@@ -27,6 +29,10 @@ export async function buildLoginUrl(): Promise<{
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
   };
+
+  if (options?.claims) {
+    params.claims = options.claims;
+  }
 
   // PAR 対応: Discovery で pushed_authorization_request_endpoint が見つかれば PAR を使用
   let url: URL;
