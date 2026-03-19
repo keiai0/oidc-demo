@@ -13,7 +13,8 @@ type Credential struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
-	PasswordCredential *PasswordCredential `gorm:"foreignKey:CredentialID"`
+	PasswordCredential    *PasswordCredential    `gorm:"foreignKey:CredentialID"`
+	ExternalIdPCredential *ExternalIdPCredential `gorm:"foreignKey:CredentialID"`
 }
 
 func (Credential) TableName() string { return "credentials" }

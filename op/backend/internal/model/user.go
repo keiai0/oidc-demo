@@ -14,6 +14,7 @@ type User struct {
 	EmailVerified bool       `gorm:"not null;default:false"`
 	Name          *string    `gorm:"type:varchar(255)"`
 	Status           string     `gorm:"type:varchar(31);not null;default:'active'"`
+	ExternalID       *string    `gorm:"type:varchar(255);index"`
 	LastLoginAt      *time.Time
 	FailedLoginCount int16      `gorm:"not null;default:0"`
 	LockedUntil      *time.Time
