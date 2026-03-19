@@ -26,6 +26,8 @@ type TokenHandler struct {
 	computeATHash       ComputeATHashFunc
 	sha256Hex           SHA256HexFunc
 	dpopJTIStore        DPoPJTIStore
+	deviceAuthStore     DeviceAuthorizationRequestStore
+	sessionFinder       SessionFinder
 	audit               *audit.AuditLogger
 	logger              *slog.Logger
 	issuerBaseURL       string
@@ -46,6 +48,8 @@ func NewTokenHandler(
 	computeATHash ComputeATHashFunc,
 	sha256Hex SHA256HexFunc,
 	dpopJTIStore DPoPJTIStore,
+	deviceAuthStore DeviceAuthorizationRequestStore,
+	sessionFinder SessionFinder,
 	auditLog *audit.AuditLogger,
 	logger *slog.Logger,
 	issuerBaseURL string,
@@ -65,6 +69,8 @@ func NewTokenHandler(
 		computeATHash:       computeATHash,
 		sha256Hex:           sha256Hex,
 		dpopJTIStore:        dpopJTIStore,
+		deviceAuthStore:     deviceAuthStore,
+		sessionFinder:       sessionFinder,
 		audit:               auditLog,
 		logger:              logger,
 		issuerBaseURL:       issuerBaseURL,
@@ -102,6 +108,8 @@ func (h *TokenHandler) Handle(c echo.Context) error {
 		return h.handleRefreshTokenGrant(c, dpopJKT)
 	case "client_credentials":
 		return h.handleClientCredentialsGrant(c, dpopJKT)
+	case "urn:ietf:params:oauth:grant-type:device_code":
+		return h.handleDeviceCodeGrant(c, dpopJKT)
 	default:
 		return tokenError(c, http.StatusBadRequest, "unsupported_grant_type", "")
 	}

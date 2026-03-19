@@ -126,6 +126,21 @@ type UserinfoJWTSigner interface {
 	SignUserInfoResponse(ctx context.Context, claims map[string]interface{}) (string, error)
 }
 
+// DeviceAuthorizationRequestStore は Device Authorization Grant (RFC 8628) のリクエスト永続化を定義する。
+type DeviceAuthorizationRequestStore interface {
+	Create(ctx context.Context, req *model.DeviceAuthorizationRequest) error
+	FindByDeviceCode(ctx context.Context, deviceCode string) (*model.DeviceAuthorizationRequest, error)
+	FindByUserCode(ctx context.Context, userCode string) (*model.DeviceAuthorizationRequest, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status string, sessionID *uuid.UUID) error
+	UpdateLastPolledAt(ctx context.Context, id uuid.UUID, t time.Time) error
+	IncrementPollInterval(ctx context.Context, id uuid.UUID, incrementSec int) error
+}
+
+// SessionFinder はセッションの検索操作を定義する。
+type SessionFinder interface {
+	FindByID(ctx context.Context, id uuid.UUID) (*model.Session, error)
+}
+
 type (
 	VerifyPasswordFunc      func(password, hash string) (bool, error)
 	VerifyCodeChallengeFunc func(verifier, challenge string) bool
