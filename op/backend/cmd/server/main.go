@@ -29,6 +29,7 @@ import (
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/metrics"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/management"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/oidc"
+	"github.com/isurugi-k/oidc-demo/op/backend/internal/scim"
 	"github.com/isurugi-k/oidc-demo/op/backend/internal/store"
 )
 
@@ -198,6 +199,14 @@ func main() {
 	// DPoP JTI Cache 初期化
 	dpopJTIRepo := store.NewDPoPJTICacheRepository(db)
 
+	// Device Authorization Grant (RFC 8628) Store 初期化
+	deviceAuthRepo := store.NewDeviceAuthorizationRequestRepository(db)
+
+	// Federation (外部 IdP 連携) Store 初期化
+	federationProviderRepo := store.NewFederationProviderRepository(db)
+	externalIdPCredRepo := store.NewExternalIdPCredentialRepository(db)
+	credentialRepo := store.NewCredentialRepository(db)
+
 	// OIDC ハンドラ初期化
 	jwksHandler := oidc.NewJWKSHandler(keySvc)
 	discoveryHandler := oidc.NewDiscoveryHandler(cfg.BaseURL, tenantRepo)
@@ -209,12 +218,34 @@ func main() {
 		crypto.VerifyPassword, crypto.VerifyCodeChallenge,
 		jwt.ComputeATHash, jwt.SHA256Hex,
 		dpopJTIRepo,
+		deviceAuthRepo, sessionRepo,
 		auditLog, slogLogger,
 		cfg.BaseURL,
 	)
 	userInfoHandler := oidc.NewUserInfoHandler(tokenSvc, userRepo, clientRepo, accessTokenRepo, dpopJTIRepo, tokenSvc, cfg.BaseURL)
 	revokeHandler := oidc.NewRevokeHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, crypto.VerifyPassword, jwt.SHA256Hex, auditLog)
 	introspectHandler := oidc.NewIntrospectHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, userRepo, crypto.VerifyPassword, jwt.SHA256Hex)
+
+	// Federation (外部 IdP 連携) サービス & ハンドラ初期化
+	federationHTTPClient := &http.Client{Timeout: 10 * time.Second}
+	federationSvc := auth.NewFederationService(
+		federationProviderRepo, externalIdPCredRepo, credentialRepo, userRepo,
+		sessionRepo, tenantRepo, crypto.Decrypt, mfaEncKey,
+		federationHTTPClient, slogLogger,
+	)
+	federationHandler := auth.NewFederationHandler(
+		federationSvc, auditLog, cfg.FrontendBaseURL, cfg.BaseURL, cfg.IsSecure(),
+	)
+	federationMgmtHandler := management.NewFederationProviderHandler(
+		federationProviderRepo, crypto.Encrypt, mfaEncKey,
+	)
+
+	// Device Authorization Grant (RFC 8628) ハンドラ初期化
+	deviceAuthorizeHandler := oidc.NewDeviceAuthorizeHandler(
+		clientRepo, tenantRepo, tenantClientRepo, deviceAuthRepo,
+		crypto.VerifyPassword, auditLog, slogLogger, cfg.BaseURL, cfg.FrontendBaseURL,
+	)
+	deviceVerifyHandler := auth.NewDeviceVerifyHandler(deviceAuthRepo, authSvc, auditLog)
 
 	// SLO (Single Logout) ハンドラ初期化
 	backChannelClient := &http.Client{Timeout: 10 * time.Second}
@@ -275,6 +306,7 @@ func main() {
 	e.POST("/:tenant_code/revoke", revokeHandler.Handle)
 	e.POST("/:tenant_code/introspect", introspectHandler.Handle)
 	e.POST("/:tenant_code/par", parHandler.Handle)
+	e.POST("/:tenant_code/device/authorize", deviceAuthorizeHandler.Handle)
 	e.GET("/:tenant_code/logout", logoutHandler.Handle)
 	e.POST("/:tenant_code/logout", logoutHandler.Handle)
 
@@ -298,6 +330,16 @@ func main() {
 	e.POST("/internal/mfa/webauthn/authenticate/complete", webauthnAuthCompleteHandler.Handle)
 	e.GET("/internal/mfa/webauthn/credentials", webauthnCredsHandler.HandleList)
 	e.DELETE("/internal/mfa/webauthn/credentials/:id", webauthnCredsHandler.HandleDelete)
+
+	// Federation (外部 IdP 連携) - Internal API
+	e.GET("/internal/federation/providers", federationHandler.HandleListProviders)
+	e.GET("/internal/federation/:provider/initiate", federationHandler.HandleInitiate)
+	e.GET("/internal/federation/:provider/callback", federationHandler.HandleCallback)
+
+	// Device Authorization Grant (RFC 8628) - ユーザー認証
+	e.GET("/internal/device/verify", deviceVerifyHandler.HandleVerify)
+	e.POST("/internal/device/approve", deviceVerifyHandler.HandleApprove)
+	e.POST("/internal/device/deny", deviceVerifyHandler.HandleDeny)
 
 	// Phase 10: ユーザーセルフサービス
 	e.POST("/internal/email/change-request", emailChangeHandler.HandleRequest)
@@ -348,11 +390,30 @@ func main() {
 	mgmtGroup.POST("/keys/rotate", keyMgmtHandler.HandleRotate)
 	mgmtGroup.DELETE("/keys/:kid", keyMgmtHandler.HandleDeactivate)
 
+	mgmtGroup.GET("/tenants/:tenant_id/federation-providers", federationMgmtHandler.HandleList)
+	mgmtGroup.POST("/tenants/:tenant_id/federation-providers", federationMgmtHandler.HandleCreate)
+	mgmtGroup.GET("/federation-providers/:id", federationMgmtHandler.HandleGet)
+	mgmtGroup.PUT("/federation-providers/:id", federationMgmtHandler.HandleUpdate)
+	mgmtGroup.DELETE("/federation-providers/:id", federationMgmtHandler.HandleDelete)
+
 	incidentHandler := management.NewIncidentHandler(sessionRepo, accessTokenRepo, refreshTokenRepo, userRepo)
 	mgmtGroup.POST("/incidents/revoke-all-tokens", incidentHandler.HandleRevokeAll)
 	mgmtGroup.POST("/incidents/revoke-tenant-tokens", incidentHandler.HandleRevokeTenant)
 	mgmtGroup.POST("/incidents/revoke-user-tokens", incidentHandler.HandleRevokeUser)
 	mgmtGroup.POST("/users/:user_id/unlock", incidentHandler.HandleUnlockUser)
+
+	// SCIM 2.0 (RFC 7644) エンドポイント
+	scimUserHandler := scim.NewUserHandler(userRepo, tenantRepo, slogLogger, cfg.BaseURL)
+	scimSchemaHandler := scim.NewSchemaHandler()
+	scimGroup := e.Group("/:tenant_code/scim/v2", scim.NewAuthMiddleware(tokenSvc))
+	scimGroup.GET("/Users", scimUserHandler.HandleList)
+	scimGroup.POST("/Users", scimUserHandler.HandleCreate)
+	scimGroup.GET("/Users/:id", scimUserHandler.HandleGet)
+	scimGroup.PATCH("/Users/:id", scimUserHandler.HandlePatch)
+	scimGroup.DELETE("/Users/:id", scimUserHandler.HandleDelete)
+	scimGroup.GET("/Schemas", scimSchemaHandler.HandleSchemas)
+	scimGroup.GET("/ServiceProviderConfig", scimSchemaHandler.HandleServiceProviderConfig)
+	scimGroup.GET("/ResourceTypes", scimSchemaHandler.HandleResourceTypes)
 
 	// 署名鍵自動ローテーション scheduler 起動
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)

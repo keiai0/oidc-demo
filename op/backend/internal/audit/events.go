@@ -14,4 +14,13 @@ const (
 	EventKeyRotated        = "key_rotated"
 	EventAdminLogin        = "admin_login"
 	EventAdminLoginFailure = "admin_login_failure"
+
+	// Device Authorization Grant (RFC 8628)
+	EventDeviceAuthorization = "device_authorization"
+	EventDeviceApproved      = "device_approved"
+	EventDeviceDenied        = "device_denied"
+
+	// Federation (外部 IdP 連携)
+	EventFederationLogin     = "federation_login"
+	EventFederationProvision = "federation_provision"
 )
