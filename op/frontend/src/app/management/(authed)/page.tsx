@@ -30,6 +30,11 @@ export default function ダッシュボードPage() {
       description: "JWT 署名鍵の管理",
     },
     {
+      title: "IdP 連携",
+      href: routes.management.federationProviders,
+      description: "外部 IdP プロバイダの管理",
+    },
+    {
       title: "インシデント",
       href: routes.management.incidents,
       description: "緊急トークン失効",

@@ -17,11 +17,25 @@ export default function LoginPage() {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [tenantCode, setTenantCode] = useState("");
   const [redirectAfterLogin, setRedirectAfterLogin] = useState("");
+  const [federationProviders, setFederationProviders] = useState<{ name: string }[]>([]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setTenantCode(params.get("tenant_code") || "demo");
+    const tc = params.get("tenant_code") || "demo";
+    setTenantCode(tc);
     setRedirectAfterLogin(params.get("redirect_after_login") || "");
+
+    // 外部 IdP プロバイダ一覧を取得
+    fetch(`${API_URL}/internal/federation/providers?tenant_code=${tc}`, {
+      credentials: "include",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.providers?.length) {
+          setFederationProviders(data.providers);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   function handleLoginSuccess(redirectTo?: string) {
@@ -279,6 +293,30 @@ export default function LoginPage() {
             パスワードをお忘れですか？
           </a>
         </div>
+
+        {federationProviders.length > 0 && (
+          <>
+            <div className="relative my-5">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-white px-2 text-gray-400">外部アカウント</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {federationProviders.map((provider) => (
+                <a
+                  key={provider.name}
+                  href={`${API_URL}/internal/federation/${provider.name}/initiate?tenant_code=${tenantCode}&redirect_after_login=${encodeURIComponent(redirectAfterLogin)}`}
+                  className="w-full block text-center py-2 px-4 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition-colors text-sm"
+                >
+                  {provider.name} でログイン
+                </a>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

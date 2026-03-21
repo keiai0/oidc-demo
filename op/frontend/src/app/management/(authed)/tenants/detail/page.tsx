@@ -165,13 +165,30 @@ export default function TenantDetailPage() {
         )}
       </Card>
 
-      <Card title="クライアント">
+      <Card title="クライアント" className="mb-6">
         <Link
           href={`${routes.management.tenantClients(id)}`}
           className="text-sm text-blue-600 hover:underline"
         >
           すべて表示
         </Link>
+      </Card>
+
+      <Card title="IdP 連携プロバイダ">
+        <div className="flex items-center justify-between">
+          <Link
+            href={`${routes.management.federationProviders}?tenant_id=${id}`}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            すべて表示
+          </Link>
+          <Link
+            href={routes.management.federationProviderNew(id)}
+            className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            追加
+          </Link>
+        </div>
       </Card>
     </div>
   );
