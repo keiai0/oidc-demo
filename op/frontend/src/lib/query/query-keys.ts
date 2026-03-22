@@ -18,4 +18,10 @@ export const queryKeys = {
     all: ["keys"] as const,
     list: () => ["keys", "list"] as const,
   },
+  federationProviders: {
+    all: ["federation-providers"] as const,
+    listByTenant: (tenantId: string) =>
+      ["federation-providers", "list", { tenantId }] as const,
+    detail: (id: string) => ["federation-providers", "detail", id] as const,
+  },
 };

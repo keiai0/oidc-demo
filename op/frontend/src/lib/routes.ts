@@ -15,5 +15,10 @@ export const routes = {
     clientDetail: (id: string) => `/management/clients/detail?id=${id}`,
     keys: "/management/keys",
     incidents: "/management/incidents",
+    federationProviders: "/management/federation-providers",
+    federationProviderNew: (tenantId: string) =>
+      `/management/federation-providers/new?tenant_id=${tenantId}`,
+    federationProviderDetail: (id: string) =>
+      `/management/federation-providers/detail?id=${id}`,
   },
 } as const;
