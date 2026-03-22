@@ -11,3 +11,4 @@ export type {
 export type { SignKey } from "./key";
 export type { RevokeResponse } from "./incident";
 export type { AdminUser } from "./auth";
+export type { FederationProvider } from "./federation-provider";
