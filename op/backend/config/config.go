@@ -25,6 +25,8 @@ type Config struct {
 	SMTPHost string
 	SMTPPort string // デフォルト 1025
 	SMTPFrom string // デフォルト noreply@oidc-demo.local
+	// デモモード: セキュリティ機構の無効化デモ用。本番では絶対に有効にしない
+	DemoMode bool
 }
 
 func Load() (*Config, error) {
@@ -94,6 +96,9 @@ func Load() (*Config, error) {
 	if cfg.SMTPFrom == "" {
 		cfg.SMTPFrom = "noreply@oidc-demo.local"
 	}
+
+	// デモモード
+	cfg.DemoMode = os.Getenv("OP_DEMO_MODE") == "true"
 
 	return cfg, nil
 }

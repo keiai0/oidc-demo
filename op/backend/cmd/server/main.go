@@ -210,7 +210,7 @@ func main() {
 	// OIDC ハンドラ初期化
 	jwksHandler := oidc.NewJWKSHandler(keySvc)
 	discoveryHandler := oidc.NewDiscoveryHandler(cfg.BaseURL, tenantRepo)
-	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, userConsentRepo, authSvc, parRepo, cfg.FrontendBaseURL)
+	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, userConsentRepo, authSvc, parRepo, cfg.FrontendBaseURL, cfg.DemoMode)
 	parHandler := oidc.NewPARHandler(clientRepo, tenantRepo, tenantClientRepo, parRepo, crypto.VerifyPassword)
 	tokenHandler := oidc.NewTokenHandler(
 		authCodeRepo, accessTokenRepo, refreshTokenRepo, idTokenRepo,
@@ -221,6 +221,7 @@ func main() {
 		deviceAuthRepo, sessionRepo,
 		auditLog, slogLogger,
 		cfg.BaseURL,
+		cfg.DemoMode,
 	)
 	userInfoHandler := oidc.NewUserInfoHandler(tokenSvc, userRepo, clientRepo, accessTokenRepo, dpopJTIRepo, tokenSvc, cfg.BaseURL)
 	revokeHandler := oidc.NewRevokeHandler(clientRepo, accessTokenRepo, refreshTokenRepo, tokenSvc, crypto.VerifyPassword, jwt.SHA256Hex, auditLog)
@@ -349,6 +350,13 @@ func main() {
 	e.POST("/internal/mfa/backup-codes/verify", backupCodeHandler.HandleVerify)
 	e.GET("/internal/sessions", sessionListHandler.HandleList)
 	e.DELETE("/internal/sessions/:id", sessionListHandler.HandleRevoke)
+
+	// Demo API (DEMO_MODE でのみ有効)
+	if cfg.DemoMode {
+		demoAuthCodeHandler := oidc.NewDemoAuthCodeHandler(authSvc, clientRepo, tenantRepo, tenantClientRepo, authCodeRepo)
+		e.POST("/api/demo/auth-code", demoAuthCodeHandler.Handle)
+		slogLogger.Info("demo mode enabled: /api/demo/auth-code registered")
+	}
 
 	// Admin auth サービス初期化
 	adminAuthSvc := management.NewAdminAuthService(adminUserRepo, adminSessionRepo, crypto.VerifyPassword)
