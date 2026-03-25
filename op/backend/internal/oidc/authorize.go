@@ -25,6 +25,7 @@ type AuthorizeHandler struct {
 	sessionValidator    SessionValidator
 	parStore            PARStore
 	loginPageURL        string
+	demoMode            bool
 }
 
 func NewAuthorizeHandler(
@@ -36,6 +37,7 @@ func NewAuthorizeHandler(
 	sessionValidator SessionValidator,
 	parStore PARStore,
 	loginPageURL string,
+	demoMode bool,
 ) *AuthorizeHandler {
 	return &AuthorizeHandler{
 		tenantFinder:        tenantFinder,
@@ -46,6 +48,7 @@ func NewAuthorizeHandler(
 		sessionValidator:    sessionValidator,
 		parStore:            parStore,
 		loginPageURL:        loginPageURL,
+		demoMode:            demoMode,
 	}
 }
 
@@ -198,8 +201,8 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		return errorRedirect(c, redirectURI, state, "unauthorized_client", "client does not support authorization_code grant")
 	}
 
-	// PKCE 検証
-	if client.RequirePKCE {
+	// PKCE 検証（デモモード時はスキップ）
+	if client.RequirePKCE && !h.demoMode {
 		if codeChallenge == "" {
 			return errorRedirect(c, redirectURI, state, "invalid_request", "code_challenge is required")
 		}

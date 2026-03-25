@@ -31,6 +31,7 @@ type TokenHandler struct {
 	audit               *audit.AuditLogger
 	logger              *slog.Logger
 	issuerBaseURL       string
+	demoMode            bool
 }
 
 func NewTokenHandler(
@@ -53,6 +54,7 @@ func NewTokenHandler(
 	auditLog *audit.AuditLogger,
 	logger *slog.Logger,
 	issuerBaseURL string,
+	demoMode bool,
 ) *TokenHandler {
 	return &TokenHandler{
 		authCodeStore:       authCodeStore,
@@ -74,6 +76,7 @@ func NewTokenHandler(
 		audit:               auditLog,
 		logger:              logger,
 		issuerBaseURL:       issuerBaseURL,
+		demoMode:            demoMode,
 	}
 }
 

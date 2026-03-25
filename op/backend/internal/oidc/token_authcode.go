@@ -76,8 +76,8 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 		return nil, ErrInvalidGrant
 	}
 
-	// PKCE 検証
-	if authCode.CodeChallenge != nil && *authCode.CodeChallenge != "" {
+	// PKCE 検証（デモモード時はスキップ）
+	if !h.demoMode && authCode.CodeChallenge != nil && *authCode.CodeChallenge != "" {
 		if input.CodeVerifier == "" {
 			return nil, ErrInvalidGrant
 		}
