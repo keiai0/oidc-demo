@@ -6,6 +6,11 @@ function requireEnv(name: string): string {
   return value;
 }
 
+/** デモモードが有効かどうかを返す。クライアント・サーバー両方で使用可能。 */
+export function isDemoMode(): boolean {
+  return process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+}
+
 export function getEnv() {
   return {
     databaseUrl: requireEnv("RP_DATABASE_URL"),

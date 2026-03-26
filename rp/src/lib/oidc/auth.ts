@@ -7,6 +7,12 @@ import { getOIDCConfig, getOIDCEnv } from "./config";
  */
 export async function buildLoginUrl(options?: {
   claims?: string;
+  /** デモ: false にすると state を生成・送信しない */
+  stateEnabled?: boolean;
+  /** デモ: false にすると PKCE (code_challenge/code_verifier) を生成・送信しない */
+  pkceEnabled?: boolean;
+  /** デモ: false にすると nonce を生成・送信しない */
+  nonceEnabled?: boolean;
 }): Promise<{
   url: URL;
   state: string;
@@ -16,19 +22,37 @@ export async function buildLoginUrl(options?: {
   const config = await getOIDCConfig();
   const env = getOIDCEnv();
 
-  const codeVerifier = client.randomPKCECodeVerifier();
-  const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);
-  const state = client.randomState();
-  const nonce = client.randomNonce();
+  const stateEnabled = options?.stateEnabled ?? true;
+  const pkceEnabled = options?.pkceEnabled ?? true;
+  const nonceEnabled = options?.nonceEnabled ?? true;
+
+  let codeVerifier = "";
+  let codeChallenge = "";
+  if (pkceEnabled) {
+    codeVerifier = client.randomPKCECodeVerifier();
+    codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);
+  }
+
+  const state = stateEnabled ? client.randomState() : "";
+  const nonce = nonceEnabled ? client.randomNonce() : "";
 
   const params: Record<string, string> = {
     redirect_uri: env.redirectUri,
     scope: "openid profile email",
-    state,
-    nonce,
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
   };
+
+  if (nonceEnabled) {
+    params.nonce = nonce;
+  }
+
+  if (pkceEnabled) {
+    params.code_challenge = codeChallenge;
+    params.code_challenge_method = "S256";
+  }
+
+  if (stateEnabled) {
+    params.state = state;
+  }
 
   if (options?.claims) {
     params.claims = options.claims;
