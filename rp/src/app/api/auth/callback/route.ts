@@ -5,6 +5,8 @@ import { fetchUserInfo } from "@/lib/oidc/userinfo";
 import { upsertUser } from "@/lib/db/queries/user";
 import { createSession } from "@/lib/db/queries/session";
 import { setSessionCookie } from "@/lib/session";
+import { isDemoMode } from "@/lib/env";
+import { getDemoConfig } from "@/lib/demo/config";
 
 export const runtime = "nodejs";
 
@@ -22,13 +24,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(errorUrl.toString());
   }
 
+  // デモモード: state / nonce / PKCE 検証の有効/無効を判定
+  const demoConfig = isDemoMode() ? await getDemoConfig() : null;
+  const stateEnabled = demoConfig?.stateEnabled ?? true;
+  const nonceEnabled = demoConfig?.nonceEnabled ?? true;
+  const pkceEnabled = demoConfig?.pkceEnabled ?? true;
+
   // 一時 Cookie から検証値を取得
   const cookieStore = await cookies();
-  const expectedState = cookieStore.get("oidc_state")?.value;
-  const expectedNonce = cookieStore.get("oidc_nonce")?.value;
-  const codeVerifier = cookieStore.get("oidc_code_verifier")?.value;
+  const expectedState = stateEnabled ? cookieStore.get("oidc_state")?.value : undefined;
+  const expectedNonce = nonceEnabled ? cookieStore.get("oidc_nonce")?.value : undefined;
+  const codeVerifier = pkceEnabled ? cookieStore.get("oidc_code_verifier")?.value : undefined;
 
-  if (!expectedState || !expectedNonce || !codeVerifier) {
+  // 各機構が有効な場合は対応する値も必須
+  if ((stateEnabled && !expectedState) || (nonceEnabled && !expectedNonce) || (pkceEnabled && !codeVerifier)) {
     const errorUrl = new URL("/error", request.nextUrl.origin);
     errorUrl.searchParams.set("error", "session_expired");
     errorUrl.searchParams.set(
@@ -38,11 +47,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(errorUrl.toString());
   }
 
+  // デモモード: 認可コードをデモパネル表示用に Cookie に保持
+  if (isDemoMode()) {
+    const authCode = searchParams.get("code");
+    if (authCode) {
+      cookieStore.set("demo_last_auth_code", authCode, {
+        httpOnly: false,
+        sameSite: "lax" as const,
+        secure: false,
+        path: "/",
+        maxAge: 300, // 5 分
+      });
+    }
+  }
+
   // 一時 Cookie を読み取り・削除
   const claimsRequestRaw = cookieStore.get("oidc_claims_request")?.value;
-  cookieStore.delete("oidc_state");
-  cookieStore.delete("oidc_nonce");
-  cookieStore.delete("oidc_code_verifier");
+  if (stateEnabled) {
+    cookieStore.delete("oidc_state");
+  }
+  if (nonceEnabled) {
+    cookieStore.delete("oidc_nonce");
+  }
+  if (pkceEnabled) {
+    cookieStore.delete("oidc_code_verifier");
+  }
   cookieStore.delete("oidc_claims_request");
 
   try {
