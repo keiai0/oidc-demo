@@ -8,6 +8,8 @@ import { IntrospectionViewer } from "@/components/introspection-viewer";
 import { ClaimsViewer } from "@/components/claims-viewer";
 import { SessionInfo } from "@/components/session-info";
 import { LogoutButton } from "@/components/logout-button";
+import { SecurityDemoPanel } from "@/components/security-demo-panel";
+import { isDemoMode } from "@/lib/env";
 import { decodeJwt } from "jose";
 
 export const dynamic = "force-dynamic";
@@ -91,6 +93,8 @@ export default async function DashboardPage() {
         />
 
         <IntrospectionViewer data={introspectionResult} error={introspectionError} />
+
+        {isDemoMode() && <SecurityDemoPanel />}
       </div>
     </div>
   );
