@@ -7,6 +7,14 @@ type TokenConfirmation struct {
 	JKT string `json:"jkt"`
 }
 
+// ActClaim は Token Exchange (RFC 8693 Section 4.1) の act クレーム。
+// 委任チェーンをネスト構造で表現する。
+type ActClaim struct {
+	Sub      string   `json:"sub"`
+	ClientID string   `json:"client_id,omitempty"`
+	Act      *ActClaim `json:"act,omitempty"`
+}
+
 type AccessTokenClaims struct {
 	Issuer       string
 	Subject      string
@@ -14,6 +22,7 @@ type AccessTokenClaims struct {
 	Scope        string
 	SessionID    string
 	Confirmation *TokenConfirmation // DPoP: cnf.jkt
+	Act          *ActClaim          // RFC 8693: delegation chain
 }
 
 // AccessTokenResult はアクセストークン検証結果。
@@ -25,4 +34,5 @@ type AccessTokenResult struct {
 	Scope     string
 	SessionID *uuid.UUID // nil for client_credentials grant
 	DPoPJKT   *string    // DPoP: cnf.jkt from token
+	Act       *ActClaim  // RFC 8693: delegation chain (nil if not a delegated token)
 }
