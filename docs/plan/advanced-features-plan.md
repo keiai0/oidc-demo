@@ -35,14 +35,14 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 ### 13-1. テスト基盤の構築
 
-- [ ] `test/` ディレクトリの作成（テストヘルパー・フィクスチャ）
-- [ ] テスト用 DB セットアップヘルパー
+- [x] `test/` ディレクトリの作成（テストヘルパー・フィクスチャ）
+- [x] テスト用 DB セットアップヘルパー
   - テスト用テナント・クライアント・ユーザーの自動作成
   - テスト間の分離（トランザクションロールバック or テーブルクリーンアップ）
-- [ ] HTTP テストクライアントヘルパー
+- [x] HTTP テストクライアントヘルパー
   - Echo の `httptest` を使ったリクエスト送信
   - レスポンスのJSON/JWT パース・検証ユーティリティ
-- [ ] OIDC フロー実行ヘルパー
+- [x] OIDC フロー実行ヘルパー
   - Authorization Code Flow の一連のステップを自動実行する関数
   - PKCE（S256）の生成・検証
   - state / nonce の生成・検証
@@ -51,11 +51,11 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 > OpenID Foundation 認定の「Config OP」プロファイルに相当
 
-- [ ] `/.well-known/openid-configuration` のレスポンス検証
+- [x] `/.well-known/openid-configuration` のレスポンス検証
   - 必須フィールドの存在確認（`issuer`, `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `response_types_supported`, `subject_types_supported`, `id_token_signing_alg_values_supported`）
   - `issuer` の末尾スラッシュルール（OIDC Discovery Section 4.3）
   - 各エンドポイント URL の疎通確認
-- [ ] JWKS エンドポイントの検証
+- [x] JWKS エンドポイントの検証
   - JWK Set のフォーマット検証（RFC 7517 Section 5）
   - `kid`, `kty`, `alg`, `use` フィールドの存在確認
   - 公開鍵でダミー JWT の署名検証が可能であること
@@ -64,12 +64,12 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 > OpenID Foundation 認定の「Basic OP」プロファイルに相当
 
-- [ ] 正常系: Authorization Code Flow + PKCE
+- [x] 正常系: Authorization Code Flow + PKCE
   - 認可リクエスト → ログイン → 認可コード発行 → トークン交換 → ID Token 検証
   - PKCE（S256）の code_verifier / code_challenge の検証
   - state パラメータの透過・検証
   - nonce クレームの ID Token 内存在確認
-- [ ] ID Token の検証項目（OIDC Core Section 3.1.3.7）
+- [x] ID Token の検証項目（OIDC Core Section 3.1.3.7）
   - `iss` がディスカバリの `issuer` と一致すること
   - `aud` に `client_id` が含まれること
   - `exp` が未来であること
@@ -77,7 +77,7 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
   - `nonce` がリクエスト時の値と一致すること
   - RS256 署名が JWKS の公開鍵で検証できること
   - `at_hash` が正しいこと（OIDC Core Section 3.1.3.6）
-- [ ] 異常系テスト
+- [x] 異常系テスト
   - 無効な `client_id` → エラーレスポンス
   - 未登録の `redirect_uri` → エラーレスポンス（リダイレクトしない）
   - PKCE `code_challenge_method=plain` → 拒否
@@ -88,53 +88,53 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 ### 13-4. Token Endpoint テスト
 
-- [ ] クライアント認証
+- [x] クライアント認証
   - `client_secret_basic` による認証
   - `client_secret_post` による認証
   - 不正な `client_secret` → `invalid_client`
-- [ ] Refresh Token Grant
+- [x] Refresh Token Grant
   - 正常な refresh → 新しい access_token + refresh_token
   - Rotation: 旧 refresh_token が無効化されること
   - Reuse Detection: 無効化済み refresh_token の使用 → セッション全体失効（RFC 9700）
-- [ ] Client Credentials Grant
+- [x] Client Credentials Grant
   - 正常なトークン発行
   - scope の制限が正しく動作すること
-- [ ] エラーレスポンスフォーマット（RFC 6749 Section 5.2）
+- [x] エラーレスポンスフォーマット（RFC 6749 Section 5.2）
   - `error`, `error_description` フィールドの存在
   - HTTP ステータスコードの正しさ
 
 ### 13-5. UserInfo テスト
 
-- [ ] 正常系
+- [x] 正常系
   - 有効なアクセストークンで userinfo 取得
   - `sub` が ID Token の `sub` と一致すること
   - scope に応じたクレームフィルタリング（`profile`, `email`）
-- [ ] 異常系
+- [x] 異常系
   - 無効なトークン → `401 Unauthorized`
   - 期限切れトークン → `401 Unauthorized`
 
 ### 13-6. Revocation / Introspection テスト
 
-- [ ] Token Revocation（RFC 7009）
+- [x] Token Revocation（RFC 7009）
   - access_token の失効 → introspection で `active: false`
   - refresh_token の失効 → 関連 access_token も失効
   - 存在しないトークンでも `200 OK`（RFC 7009 要件）
-- [ ] Token Introspection（RFC 7662）
+- [x] Token Introspection（RFC 7662）
   - 有効なトークン → `active: true` + クレーム
   - 無効なトークン → `active: false`
 
 ### 13-7. PAR テスト（RFC 9126）
 
-- [ ] 正常系
+- [x] 正常系
   - PAR → `request_uri` 取得 → 認可リクエストに使用 → トークン交換
   - `request_uri` の有効期限検証
-- [ ] 異常系
+- [x] 異常系
   - `request_uri` の再利用 → 拒否
   - 期限切れ `request_uri` → 拒否
 
 ### 13-8. ログアウトテスト
 
-- [ ] RP-Initiated Logout
+- [x] RP-Initiated Logout
   - `id_token_hint` 付きログアウト → セッション失効
   - `post_logout_redirect_uri` の検証
 - [ ] Back-Channel Logout
@@ -144,9 +144,9 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 ### 完了条件
 
-- 全テストカテゴリでテストが pass する
-- テスト実行で発見された仕様違反が修正されている
-- `cd op/backend && go test ./test/...` で全テストが実行できる
+- [x] 全テストカテゴリでテストが pass する
+- [x] テスト実行で発見された仕様違反が修正されている
+- [x] `cd op/backend && go test ./test/...` で全テストが実行できる
 
 ---
 
