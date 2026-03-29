@@ -20,6 +20,9 @@ const (
 	EventDeviceApproved      = "device_approved"
 	EventDeviceDenied        = "device_denied"
 
+	// Token Exchange (RFC 8693)
+	EventTokenExchanged = "token_exchanged"
+
 	// Federation (外部 IdP 連携)
 	EventFederationLogin     = "federation_login"
 	EventFederationProvision = "federation_provision"

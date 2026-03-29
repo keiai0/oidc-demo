@@ -231,6 +231,7 @@ func setupServer(db *gorm.DB) *httptest.Server {
 	parRepo := store.NewPushedAuthorizationRequestRepository(db)
 	dpopJTIRepo := store.NewDPoPJTICacheRepository(db)
 	deviceAuthRepo := store.NewDeviceAuthorizationRequestRepository(db)
+	tokenExchangePolicyRepo := store.NewTokenExchangePolicyRepository(db)
 
 	// Federation
 	federationProviderRepo := store.NewFederationProviderRepository(db)
@@ -282,6 +283,7 @@ func setupServer(db *gorm.DB) *httptest.Server {
 		jwt.ComputeATHash, jwt.SHA256Hex,
 		dpopJTIRepo,
 		deviceAuthRepo, sessionRepo,
+		tokenSvc, tokenExchangePolicyRepo,
 		auditLog, slogLogger,
 		baseURL,
 		false,

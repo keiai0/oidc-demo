@@ -108,6 +108,11 @@ func (s *TokenService) SignAccessToken(ctx context.Context, claims *model.Access
 		builder = builder.Claim("cnf", map[string]string{"jkt": claims.Confirmation.JKT})
 	}
 
+	// Token Exchange: act クレーム (RFC 8693 Section 4.1)
+	if claims.Act != nil {
+		builder = builder.Claim("act", claims.Act)
+	}
+
 	token, err := builder.Build()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to build access token: %w", err)
@@ -179,6 +184,13 @@ func (s *TokenService) ValidateAccessToken(ctx context.Context, tokenString stri
 		}
 	}
 
+	// Token Exchange: act クレーム抽出 (RFC 8693 Section 4.1)
+	var act *model.ActClaim
+	var actRaw map[string]interface{}
+	if err := token.Get("act", &actRaw); err == nil {
+		act = parseActClaim(actRaw)
+	}
+
 	return &model.AccessTokenResult{
 		JTI:       jti,
 		Subject:   sub,
@@ -186,6 +198,7 @@ func (s *TokenService) ValidateAccessToken(ctx context.Context, tokenString stri
 		Scope:     scope,
 		SessionID: sessionID,
 		DPoPJKT:   dpopJKT,
+		Act:       act,
 	}, nil
 }
 
@@ -225,6 +238,24 @@ func (s *TokenService) SignUserInfoResponse(ctx context.Context, claims map[stri
 	}
 
 	return string(signed), nil
+}
+
+// parseActClaim は map[string]interface{} を ActClaim に再帰的に変換する。
+func parseActClaim(raw map[string]interface{}) *model.ActClaim {
+	if raw == nil {
+		return nil
+	}
+	act := &model.ActClaim{}
+	if sub, ok := raw["sub"].(string); ok {
+		act.Sub = sub
+	}
+	if cid, ok := raw["client_id"].(string); ok {
+		act.ClientID = cid
+	}
+	if nested, ok := raw["act"].(map[string]interface{}); ok {
+		act.Act = parseActClaim(nested)
+	}
+	return act
 }
 
 // ComputeATHash は at_hash を計算する (OIDC Core 1.0 Section 3.1.3.6)
