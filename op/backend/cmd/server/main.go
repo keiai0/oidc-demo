@@ -202,6 +202,9 @@ func main() {
 	// Device Authorization Grant (RFC 8628) Store 初期化
 	deviceAuthRepo := store.NewDeviceAuthorizationRequestRepository(db)
 
+	// Token Exchange (RFC 8693) Store 初期化
+	tokenExchangePolicyRepo := store.NewTokenExchangePolicyRepository(db)
+
 	// Federation (外部 IdP 連携) Store 初期化
 	federationProviderRepo := store.NewFederationProviderRepository(db)
 	externalIdPCredRepo := store.NewExternalIdPCredentialRepository(db)
@@ -219,6 +222,7 @@ func main() {
 		jwt.ComputeATHash, jwt.SHA256Hex,
 		dpopJTIRepo,
 		deviceAuthRepo, sessionRepo,
+		tokenSvc, tokenExchangePolicyRepo,
 		auditLog, slogLogger,
 		cfg.BaseURL,
 		cfg.DemoMode,
@@ -403,6 +407,11 @@ func main() {
 	mgmtGroup.GET("/federation-providers/:id", federationMgmtHandler.HandleGet)
 	mgmtGroup.PUT("/federation-providers/:id", federationMgmtHandler.HandleUpdate)
 	mgmtGroup.DELETE("/federation-providers/:id", federationMgmtHandler.HandleDelete)
+
+	tokenExchangePolicyMgmtHandler := management.NewTokenExchangePolicyHandler(tokenExchangePolicyRepo)
+	mgmtGroup.GET("/clients/:id/token-exchange-policy", tokenExchangePolicyMgmtHandler.HandleGet)
+	mgmtGroup.PUT("/clients/:id/token-exchange-policy", tokenExchangePolicyMgmtHandler.HandleCreateOrUpdate)
+	mgmtGroup.DELETE("/clients/:id/token-exchange-policy", tokenExchangePolicyMgmtHandler.HandleDelete)
 
 	incidentHandler := management.NewIncidentHandler(sessionRepo, accessTokenRepo, refreshTokenRepo, userRepo)
 	mgmtGroup.POST("/incidents/revoke-all-tokens", incidentHandler.HandleRevokeAll)

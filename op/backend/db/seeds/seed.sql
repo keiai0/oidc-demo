@@ -62,6 +62,35 @@ INSERT INTO password_credentials (id, credential_id, password_hash, algorithm, u
     ('e0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', '$argon2id$v=19$m=65536,t=3,p=4$p/1zKj9TNYyP56xhmjyAtQ$JXv9c0nSybiSzZ3goGEpvciL2MHEAimZaBcuzYXxQdc', 'argon2id', NOW())
 ON CONFLICT (id) DO NOTHING;
 
+-- Token Exchange デモ用 M2M クライアント (demo-service / demo-service-secret)
+INSERT INTO clients (id, client_id, client_secret_hash, name, grant_types, response_types, token_endpoint_auth_method, require_pkce, status) VALUES
+    ('c0000000-0000-0000-0000-000000000002',
+     'demo-service',
+     '$argon2id$v=19$m=65536,t=3,p=4$XLnZ4+fz/MCzO+Ax4vynLg$wb2a0Uwr1mgjZnTMCFylw7XCCgBR81ueDM+OmWcGQGM',
+     'Demo Service (Token Exchange)',
+     '["client_credentials", "urn:ietf:params:oauth:grant-type:token-exchange"]',
+     '["code"]',
+     'client_secret_basic',
+     false,
+     'active')
+ON CONFLICT (id) DO NOTHING;
+
+-- demo-service のテナント紐づけ
+INSERT INTO tenant_clients (tenant_id, client_id) VALUES
+    ('a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002')
+ON CONFLICT (tenant_id, client_id) DO NOTHING;
+
+-- Token Exchange ポリシー (demo-service: Impersonation + Delegation 両方許可)
+INSERT INTO token_exchange_policies (id, client_id, allowed_subject_token_types, allowed_requested_token_types, allowed_audiences, allow_impersonation, allow_delegation) VALUES
+    ('f1000000-0000-0000-0000-000000000001',
+     'c0000000-0000-0000-0000-000000000002',
+     '["urn:ietf:params:oauth:token-type:access_token"]',
+     '["urn:ietf:params:oauth:token-type:access_token"]',
+     '[]',
+     true,
+     true)
+ON CONFLICT (client_id) DO NOTHING;
+
 -- 開発用管理ユーザー (admin / admin)
 INSERT INTO admin_users (id, login_id, password_hash, name, status) VALUES
     ('f0000000-0000-0000-0000-000000000001', 'admin', '$argon2id$v=19$m=65536,t=3,p=4$Uo9ePSD5eq6LtwxkBckU7Q$IfMdE7Ae3M+KxlgYyAFouY5jVeoZ7q4XOM7ZkYQoSdg', 'Administrator', 'active')
