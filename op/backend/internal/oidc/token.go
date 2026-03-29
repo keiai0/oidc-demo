@@ -12,26 +12,28 @@ import (
 )
 
 type TokenHandler struct {
-	authCodeStore       AuthorizationCodeStore
-	accessTokenStore    AccessTokenStore
-	refreshTokenStore   RefreshTokenStore
-	idTokenCreator      IDTokenCreator
-	clientFinder        ClientFinder
-	tenantFinder        TenantFinder
-	tenantClientChecker TenantClientChecker
-	userFinder          UserFinder
-	tokenSigner         TokenSigner
-	verifyPassword      VerifyPasswordFunc
-	verifyCodeChallenge VerifyCodeChallengeFunc
-	computeATHash       ComputeATHashFunc
-	sha256Hex           SHA256HexFunc
-	dpopJTIStore        DPoPJTIStore
-	deviceAuthStore     DeviceAuthorizationRequestStore
-	sessionFinder       SessionFinder
-	audit               *audit.AuditLogger
-	logger              *slog.Logger
-	issuerBaseURL       string
-	demoMode            bool
+	authCodeStore              AuthorizationCodeStore
+	accessTokenStore           AccessTokenStore
+	refreshTokenStore          RefreshTokenStore
+	idTokenCreator             IDTokenCreator
+	clientFinder               ClientFinder
+	tenantFinder               TenantFinder
+	tenantClientChecker        TenantClientChecker
+	userFinder                 UserFinder
+	tokenSigner                TokenSigner
+	verifyPassword             VerifyPasswordFunc
+	verifyCodeChallenge        VerifyCodeChallengeFunc
+	computeATHash              ComputeATHashFunc
+	sha256Hex                  SHA256HexFunc
+	dpopJTIStore               DPoPJTIStore
+	deviceAuthStore            DeviceAuthorizationRequestStore
+	sessionFinder              SessionFinder
+	tokenValidator             TokenValidator
+	tokenExchangePolicyFinder  TokenExchangePolicyFinder
+	audit                      *audit.AuditLogger
+	logger                     *slog.Logger
+	issuerBaseURL              string
+	demoMode                   bool
 }
 
 func NewTokenHandler(
@@ -51,32 +53,36 @@ func NewTokenHandler(
 	dpopJTIStore DPoPJTIStore,
 	deviceAuthStore DeviceAuthorizationRequestStore,
 	sessionFinder SessionFinder,
+	tokenValidator TokenValidator,
+	tokenExchangePolicyFinder TokenExchangePolicyFinder,
 	auditLog *audit.AuditLogger,
 	logger *slog.Logger,
 	issuerBaseURL string,
 	demoMode bool,
 ) *TokenHandler {
 	return &TokenHandler{
-		authCodeStore:       authCodeStore,
-		accessTokenStore:    accessTokenStore,
-		refreshTokenStore:   refreshTokenStore,
-		idTokenCreator:      idTokenCreator,
-		clientFinder:        clientFinder,
-		tenantFinder:        tenantFinder,
-		tenantClientChecker: tenantClientChecker,
-		userFinder:          userFinder,
-		tokenSigner:         tokenSigner,
-		verifyPassword:      verifyPassword,
-		verifyCodeChallenge: verifyCodeChallenge,
-		computeATHash:       computeATHash,
-		sha256Hex:           sha256Hex,
-		dpopJTIStore:        dpopJTIStore,
-		deviceAuthStore:     deviceAuthStore,
-		sessionFinder:       sessionFinder,
-		audit:               auditLog,
-		logger:              logger,
-		issuerBaseURL:       issuerBaseURL,
-		demoMode:            demoMode,
+		authCodeStore:             authCodeStore,
+		accessTokenStore:          accessTokenStore,
+		refreshTokenStore:         refreshTokenStore,
+		idTokenCreator:            idTokenCreator,
+		clientFinder:              clientFinder,
+		tenantFinder:              tenantFinder,
+		tenantClientChecker:       tenantClientChecker,
+		userFinder:                userFinder,
+		tokenSigner:               tokenSigner,
+		verifyPassword:            verifyPassword,
+		verifyCodeChallenge:       verifyCodeChallenge,
+		computeATHash:             computeATHash,
+		sha256Hex:                 sha256Hex,
+		dpopJTIStore:              dpopJTIStore,
+		deviceAuthStore:           deviceAuthStore,
+		sessionFinder:             sessionFinder,
+		tokenValidator:            tokenValidator,
+		tokenExchangePolicyFinder: tokenExchangePolicyFinder,
+		audit:                     auditLog,
+		logger:                    logger,
+		issuerBaseURL:             issuerBaseURL,
+		demoMode:                  demoMode,
 	}
 }
 
@@ -113,6 +119,8 @@ func (h *TokenHandler) Handle(c echo.Context) error {
 		return h.handleClientCredentialsGrant(c, dpopJKT)
 	case "urn:ietf:params:oauth:grant-type:device_code":
 		return h.handleDeviceCodeGrant(c, dpopJKT)
+	case GrantTypeTokenExchange:
+		return h.handleTokenExchangeGrant(c, dpopJKT)
 	default:
 		return tokenError(c, http.StatusBadRequest, "unsupported_grant_type", "")
 	}

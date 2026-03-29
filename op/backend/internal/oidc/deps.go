@@ -141,6 +141,12 @@ type SessionFinder interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*model.Session, error)
 }
 
+// TokenExchangePolicyFinder は Token Exchange ポリシーの検索を定義する (RFC 8693)。
+type TokenExchangePolicyFinder interface {
+	// FindByClientID はクライアント DB ID でポリシーを検索する。見つからなければ (nil, nil)。
+	FindByClientID(ctx context.Context, clientID uuid.UUID) (*model.TokenExchangePolicy, error)
+}
+
 type (
 	VerifyPasswordFunc      func(password, hash string) (bool, error)
 	VerifyCodeChallengeFunc func(verifier, challenge string) bool

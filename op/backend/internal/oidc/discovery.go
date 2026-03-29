@@ -46,7 +46,7 @@ func (h *DiscoveryHandler) Handle(c echo.Context) error {
 		"require_pushed_authorization_requests":            false,
 		"response_types_supported":              []string{"code"},
 		"device_authorization_endpoint":          issuer + "/device/authorize",
-		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "client_credentials", "urn:ietf:params:oauth:grant-type:device_code"},
+		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "client_credentials", "urn:ietf:params:oauth:grant-type:device_code", GrantTypeTokenExchange},
 		"subject_types_supported":               []string{"public", "pairwise"},
 		"id_token_signing_alg_values_supported": []string{"RS256"},
 		"scopes_supported":                      []string{"openid", "profile", "email", "offline_access", "scim"},
