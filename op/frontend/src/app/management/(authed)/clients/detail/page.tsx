@@ -5,6 +5,7 @@ import { Fragment, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi } from "@/lib/api/clients";
+import { tokenExchangePoliciesApi } from "@/lib/api/token-exchange-policies";
 import { tenantsApi } from "@/lib/api/tenants";
 import { getErrorMessage } from "@/lib/fetcher";
 import { queryKeys } from "@/lib/query/query-keys";
@@ -27,6 +28,9 @@ export default function ClientDetailPage() {
   const [subjectType, setSubjectType] = useState("");
   const [sectorIdentifierUri, setSectorIdentifierUri] = useState("");
   const [userinfoSignedAlg, setUserinfoSignedAlg] = useState("");
+  const [editingTokenExchange, setEditingTokenExchange] = useState(false);
+  const [teAllowImpersonation, setTeAllowImpersonation] = useState(false);
+  const [teAllowDelegation, setTeAllowDelegation] = useState(true);
 
   const { data: client, isLoading } = useQuery({
     queryKey: queryKeys.clients.detail(id),
@@ -45,8 +49,19 @@ export default function ClientDetailPage() {
     queryFn: () => tenantsApi.list(250, 0),
   });
 
+  const { data: tokenExchangePolicy } = useQuery({
+    queryKey: queryKeys.clients.tokenExchangePolicy(id),
+    queryFn: () => tokenExchangePoliciesApi.get(id).catch(() => null),
+    enabled: !!id,
+  });
+
   const invalidateClient = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.clients.detail(id) });
+
+  const invalidateTokenExchangePolicy = () =>
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.clients.tokenExchangePolicy(id),
+    });
 
   const invalidateTenants = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.clients.tenants(id) });
@@ -125,6 +140,47 @@ export default function ClientDetailPage() {
     },
     onError: (err) => setError(getErrorMessage(err)),
   });
+
+  const saveTokenExchangePolicyMutation = useMutation({
+    mutationFn: () =>
+      tokenExchangePoliciesApi.createOrUpdate(id, {
+        allowed_subject_token_types: [
+          "urn:ietf:params:oauth:token-type:access_token",
+        ],
+        allowed_requested_token_types: [
+          "urn:ietf:params:oauth:token-type:access_token",
+        ],
+        allowed_audiences: [],
+        allow_impersonation: teAllowImpersonation,
+        allow_delegation: teAllowDelegation,
+      }),
+    onSuccess: () => {
+      setError("");
+      setEditingTokenExchange(false);
+      invalidateTokenExchangePolicy();
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  const deleteTokenExchangePolicyMutation = useMutation({
+    mutationFn: () => tokenExchangePoliciesApi.delete(id),
+    onSuccess: () => {
+      setError("");
+      invalidateTokenExchangePolicy();
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  const startEditTokenExchange = () => {
+    if (tokenExchangePolicy) {
+      setTeAllowImpersonation(tokenExchangePolicy.allow_impersonation);
+      setTeAllowDelegation(tokenExchangePolicy.allow_delegation);
+    } else {
+      setTeAllowImpersonation(false);
+      setTeAllowDelegation(true);
+    }
+    setEditingTokenExchange(true);
+  };
 
   const updateOidcMutation = useMutation({
     mutationFn: () =>
@@ -451,6 +507,83 @@ export default function ClientDetailPage() {
             追加
           </button>
         </div>
+      </Card>
+
+      {/* Token Exchange Policy (RFC 8693) */}
+      <Card
+        title="Token Exchange ポリシー (RFC 8693)"
+        titleAction={
+          !editingTokenExchange ? (
+            <button
+              onClick={startEditTokenExchange}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              {tokenExchangePolicy ? "編集" : "作成"}
+            </button>
+          ) : undefined
+        }
+        className="mb-4"
+      >
+        {editingTokenExchange ? (
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={teAllowImpersonation}
+                onChange={(e) => setTeAllowImpersonation(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              Impersonation を許可（actor_token なしでのトークン交換）
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={teAllowDelegation}
+                onChange={(e) => setTeAllowDelegation(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              Delegation を許可（act クレーム付きトークン発行）
+            </label>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => saveTokenExchangePolicyMutation.mutate()}
+                disabled={saveTokenExchangePolicyMutation.isPending}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saveTokenExchangePolicyMutation.isPending ? "保存中..." : "保存"}
+              </button>
+              <button
+                onClick={() => setEditingTokenExchange(false)}
+                className="px-4 py-2 border border-gray-300 text-sm rounded text-gray-700 hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        ) : tokenExchangePolicy ? (
+          <div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <dt className="text-gray-500">Impersonation</dt>
+              <dd>{tokenExchangePolicy.allow_impersonation ? "許可" : "不許可"}</dd>
+              <dt className="text-gray-500">Delegation</dt>
+              <dd>{tokenExchangePolicy.allow_delegation ? "許可" : "不許可"}</dd>
+            </dl>
+            <button
+              onClick={() => {
+                if (confirm("Token Exchange ポリシーを削除しますか？")) {
+                  deleteTokenExchangePolicyMutation.mutate();
+                }
+              }}
+              className="mt-4 text-sm text-red-500 hover:text-red-700"
+            >
+              ポリシーを削除
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">
+            ポリシーが設定されていません。作成すると Token Exchange が有効になります。
+          </p>
+        )}
       </Card>
 
       {/* Danger Zone */}

@@ -13,6 +13,8 @@ export const queryKeys = {
       ["clients", "list", { tenantId }] as const,
     detail: (id: string) => ["clients", "detail", id] as const,
     tenants: (id: string) => ["clients", "tenants", id] as const,
+    tokenExchangePolicy: (id: string) =>
+      ["clients", "token-exchange-policy", id] as const,
   },
   keys: {
     all: ["keys"] as const,
