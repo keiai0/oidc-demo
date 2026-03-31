@@ -147,9 +147,49 @@ type TokenExchangePolicyFinder interface {
 	FindByClientID(ctx context.Context, clientID uuid.UUID) (*model.TokenExchangePolicy, error)
 }
 
+// ClientCreator はクライアントの新規作成を定義する (Dynamic Client Registration)。
+type ClientCreator interface {
+	Create(ctx context.Context, client *model.Client) error
+}
+
+// ClientUpdater はクライアントの更新を定義する (Dynamic Client Registration)。
+type ClientUpdater interface {
+	Update(ctx context.Context, client *model.Client) error
+	SoftDelete(ctx context.Context, id uuid.UUID) error
+}
+
+// InitialAccessTokenFinder は Initial Access Token の検索と使用回数更新を定義する (RFC 7591)。
+type InitialAccessTokenFinder interface {
+	// FindByTokenHash はトークンハッシュで IAT を検索する。見つからなければ (nil, nil)。
+	FindByTokenHash(ctx context.Context, hash string) (*model.InitialAccessToken, error)
+	// IncrementUsedCount は使用回数を 1 加算する。
+	IncrementUsedCount(ctx context.Context, id uuid.UUID) error
+}
+
+// ClientRegistrationStore は Dynamic Client Registration のメタデータ永続化を定義する (RFC 7591/7592)。
+type ClientRegistrationStore interface {
+	Create(ctx context.Context, reg *model.ClientRegistration) error
+	FindByClientID(ctx context.Context, clientID uuid.UUID) (*model.ClientRegistration, error)
+	FindByRegistrationTokenHash(ctx context.Context, hash string) (*model.ClientRegistration, error)
+	Update(ctx context.Context, reg *model.ClientRegistration) error
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+// TenantClientCreator はテナント-クライアント紐づけの作成を定義する。
+type TenantClientCreator interface {
+	Create(ctx context.Context, tc *model.TenantClient) error
+}
+
+// RedirectURICreator はリダイレクト URI の永続化を定義する。
+type RedirectURICreator interface {
+	Create(ctx context.Context, uri *model.RedirectURI) error
+	DeleteByClientID(ctx context.Context, clientDBID uuid.UUID) error
+}
+
 type (
 	VerifyPasswordFunc      func(password, hash string) (bool, error)
 	VerifyCodeChallengeFunc func(verifier, challenge string) bool
 	ComputeATHashFunc       func(accessToken string) string
 	SHA256HexFunc           func(s string) string
+	HashPasswordFunc        func(password string) (string, error)
 )

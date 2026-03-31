@@ -52,6 +52,7 @@ func (h *DiscoveryHandler) Handle(c echo.Context) error {
 		"scopes_supported":                      []string{"openid", "profile", "email", "offline_access", "scim"},
 		"token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"},
 		"code_challenge_methods_supported":      []string{"S256"},
+		"registration_endpoint":                   issuer + "/register",
 		"end_session_endpoint":                    issuer + "/logout",
 		"frontchannel_logout_supported":           true,
 		"frontchannel_logout_session_supported":   true,
