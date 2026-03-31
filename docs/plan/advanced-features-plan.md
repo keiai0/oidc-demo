@@ -167,17 +167,17 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 ### 14-1. データモデル
 
-- [ ] `token_exchange_policies` テーブルの作成
+- [x] `token_exchange_policies` テーブルの作成
   - どのクライアントがどのトークンタイプの交換を許可されるかのポリシー
   - `id`, `client_id`, `allowed_subject_token_types`, `allowed_requested_token_types`, `allowed_audiences`, `allow_impersonation`, `allow_delegation`
   - **仕様参照:** RFC 8693 Section 1（セキュリティ上、AS はポリシーに基づいて交換を制御する SHOULD）
 
 ### 14-2. Token Exchange Grant 実装
 
-- [ ] `internal/oidc/token_exchange.go` の作成
+- [x] `internal/oidc/token_exchange.go` の作成
   - grant_type: `urn:ietf:params:oauth:grant-type:token-exchange`
   - **仕様参照:** RFC 8693 Section 2.1（リクエストパラメータ）
-- [ ] リクエストパラメータの検証
+- [x] リクエストパラメータの検証
   - `subject_token`（REQUIRED）: 対象者のトークン
   - `subject_token_type`（REQUIRED）: トークンタイプ URI
   - `actor_token`（OPTIONAL）: 委任者のトークン
@@ -186,60 +186,60 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
   - `audience`（OPTIONAL）: ターゲットサービスの論理名
   - `scope`（OPTIONAL）: 要求するスコープ
   - `requested_token_type`（OPTIONAL）: 要求するトークンタイプ
-- [ ] Subject Token の検証
+- [x] Subject Token の検証
   - `urn:ietf:params:oauth:token-type:access_token` → アクセストークンとして検証
   - `urn:ietf:params:oauth:token-type:id_token` → ID Token として検証
   - `urn:ietf:params:oauth:token-type:jwt` → JWT として署名検証
-- [ ] ポリシーチェック
+- [x] ポリシーチェック
   - クライアントが token exchange を許可されているか
   - 要求されたトークンタイプが許可されているか
   - audience が許可されているか
 
 ### 14-3. Impersonation（なりすまし）
 
-- [ ] Impersonation トークンの発行
+- [x] Impersonation トークンの発行
   - `sub` は subject_token のユーザー
   - `client_id` は交換を要求したクライアント
   - `scope` は要求されたスコープ（元のスコープ以下に制限）
   - **仕様参照:** RFC 8693 Section 2.1（Impersonation Semantics）
-- [ ] レスポンス
+- [x] レスポンス
   - `issued_token_type`: 発行されたトークンのタイプ URI
   - `token_type`: `Bearer`
   - `expires_in`: 有効期限（元のトークンより短くする SHOULD）
 
 ### 14-4. Delegation（委任）
 
-- [ ] `act` クレームの実装
+- [x] `act` クレームの実装
   - **仕様参照:** RFC 8693 Section 4.1（`act` Claim）
   - `act` は委任チェーンを表すネストされたオブジェクト
   - 例: `{"act": {"sub": "service-a", "act": {"sub": "service-b"}}}`
-- [ ] `may_act` クレームの検証
+- [x] `may_act` クレームの検証
   - **仕様参照:** RFC 8693 Section 4.2（`may_act` Claim）
   - subject_token に `may_act` がある場合、actor がその条件を満たすか検証
-- [ ] Delegation トークンの発行
+- [x] Delegation トークンの発行
   - `sub` は元のユーザー
   - `act` クレームで委任チェーンを記録
 
 ### 14-5. token endpoint への統合
 
-- [ ] `internal/oidc/token.go` に token-exchange ディスパッチを追加
-- [ ] Discovery エンドポイントの更新
+- [x] `internal/oidc/token.go` に token-exchange ディスパッチを追加
+- [x] Discovery エンドポイントの更新
   - `grant_types_supported` に `urn:ietf:params:oauth:grant-type:token-exchange` を追加
-- [ ] エラーハンドリング
+- [x] エラーハンドリング
   - `invalid_request`: 必須パラメータ不足
   - `invalid_grant`: subject_token / actor_token の検証失敗
   - `invalid_target`: audience / resource が許可されていない（RFC 8693 Section 2.2.1）
 
 ### 14-6. 管理 API・UI
 
-- [ ] Token Exchange ポリシーの CRUD API
+- [x] Token Exchange ポリシーの CRUD API
   - `GET /management/v1/clients/:id/token-exchange-policy`
   - `PUT /management/v1/clients/:id/token-exchange-policy`
-- [ ] OP Frontend にポリシー設定画面を追加
+- [x] OP Frontend にポリシー設定画面を追加
 
 ### 14-7. RP での動作検証 UI
 
-- [ ] RP に Token Exchange デモページを追加
+- [x] RP に Token Exchange デモページを追加
   - 取得済みアクセストークンを subject_token として交換リクエストを送信
   - Impersonation / Delegation の切り替え
   - 交換前後のトークンのクレーム比較表示
@@ -247,11 +247,11 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 ### 完了条件
 
-- Impersonation でトークン交換が動作する
-- Delegation で `act` クレーム付きトークンが発行される
-- ポリシー未設定のクライアントからの交換が拒否される
-- RP のデモ UI で交換前後のトークンを比較確認できる
-- `cd op/backend && go test ./...` が pass する
+- [x] Impersonation でトークン交換が動作する
+- [x] Delegation で `act` クレーム付きトークンが発行される
+- [x] ポリシー未設定のクライアントからの交換が拒否される
+- [x] RP のデモ UI で交換前後のトークンを比較確認できる
+- [x] `cd op/backend && go test ./...` が pass する
 
 ---
 
