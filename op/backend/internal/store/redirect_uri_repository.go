@@ -54,3 +54,8 @@ func (r *RedirectURIRepository) FindByID(ctx context.Context, id uuid.UUID) (*mo
 func (r *RedirectURIRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Delete(&model.RedirectURI{}, "id = ?", id).Error
 }
+
+// DeleteByClientID はクライアントに属する全てのリダイレクト URI を削除する。
+func (r *RedirectURIRepository) DeleteByClientID(ctx context.Context, clientDBID uuid.UUID) error {
+	return r.db.WithContext(ctx).Where("client_id = ?", clientDBID).Delete(&model.RedirectURI{}).Error
+}
