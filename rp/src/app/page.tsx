@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ClaimsConfig } from "@/components/claims-config";
 import { SecurityDemoPanel } from "@/components/security-demo-panel";
 import { isDemoMode } from "@/lib/env";
@@ -29,6 +30,15 @@ export default function LoginPage() {
             <br />
             Authorization Code Flow (PKCE) で認証します
           </p>
+        </div>
+
+        <div className="p-4 bg-white rounded-lg shadow-md text-center">
+          <Link
+            href="/dynamic-registration"
+            className="text-blue-600 hover:underline text-sm"
+          >
+            Dynamic Client Registration デモ →
+          </Link>
         </div>
 
         {demoMode && <SecurityDemoPanel />}
