@@ -205,6 +205,10 @@ func main() {
 	// Token Exchange (RFC 8693) Store 初期化
 	tokenExchangePolicyRepo := store.NewTokenExchangePolicyRepository(db)
 
+	// Dynamic Client Registration (RFC 7591/7592) Store 初期化
+	iatRepo := store.NewInitialAccessTokenRepository(db)
+	clientRegRepo := store.NewClientRegistrationRepository(db)
+
 	// Federation (外部 IdP 連携) Store 初期化
 	federationProviderRepo := store.NewFederationProviderRepository(db)
 	externalIdPCredRepo := store.NewExternalIdPCredentialRepository(db)
@@ -251,6 +255,15 @@ func main() {
 		crypto.VerifyPassword, auditLog, slogLogger, cfg.BaseURL, cfg.FrontendBaseURL,
 	)
 	deviceVerifyHandler := auth.NewDeviceVerifyHandler(deviceAuthRepo, authSvc, auditLog)
+
+	// Dynamic Client Registration (RFC 7591/7592) ハンドラ初期化
+	registrationHandler := oidc.NewRegistrationHandler(
+		tenantRepo, clientRepo, clientRepo, clientRepo,
+		tenantClientRepo, tenantClientRepo, redirectURIRepo,
+		iatRepo, clientRegRepo,
+		crypto.HashPassword, jwt.SHA256Hex,
+		cfg.BaseURL,
+	)
 
 	// SLO (Single Logout) ハンドラ初期化
 	backChannelClient := &http.Client{Timeout: 10 * time.Second}
@@ -314,6 +327,12 @@ func main() {
 	e.POST("/:tenant_code/device/authorize", deviceAuthorizeHandler.Handle)
 	e.GET("/:tenant_code/logout", logoutHandler.Handle)
 	e.POST("/:tenant_code/logout", logoutHandler.Handle)
+
+	// Dynamic Client Registration (RFC 7591/7592)
+	e.POST("/:tenant_code/register", registrationHandler.HandleRegister)
+	e.GET("/:tenant_code/register/:client_id", registrationHandler.HandleGetClient)
+	e.PUT("/:tenant_code/register/:client_id", registrationHandler.HandleUpdateClient)
+	e.DELETE("/:tenant_code/register/:client_id", registrationHandler.HandleDeleteClient)
 
 	// Internal API (OP Frontend 向け)
 	loginRateLimiter := auth.NewRateLimiter(10, 1*time.Minute)
@@ -412,6 +431,11 @@ func main() {
 	mgmtGroup.GET("/clients/:id/token-exchange-policy", tokenExchangePolicyMgmtHandler.HandleGet)
 	mgmtGroup.PUT("/clients/:id/token-exchange-policy", tokenExchangePolicyMgmtHandler.HandleCreateOrUpdate)
 	mgmtGroup.DELETE("/clients/:id/token-exchange-policy", tokenExchangePolicyMgmtHandler.HandleDelete)
+
+	iatMgmtHandler := management.NewInitialAccessTokenHandler(iatRepo, tenantRepo, jwt.SHA256Hex)
+	mgmtGroup.POST("/tenants/:tenant_id/initial-access-tokens", iatMgmtHandler.HandleCreate)
+	mgmtGroup.GET("/tenants/:tenant_id/initial-access-tokens", iatMgmtHandler.HandleList)
+	mgmtGroup.DELETE("/initial-access-tokens/:id", iatMgmtHandler.HandleRevoke)
 
 	incidentHandler := management.NewIncidentHandler(sessionRepo, accessTokenRepo, refreshTokenRepo, userRepo)
 	mgmtGroup.POST("/incidents/revoke-all-tokens", incidentHandler.HandleRevokeAll)
