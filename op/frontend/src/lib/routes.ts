@@ -13,6 +13,7 @@ export const routes = {
     tenantClientNew: (tenantId: string) =>
       `/management/tenants/detail/clients/new?tenant_id=${tenantId}`,
     clientDetail: (id: string) => `/management/clients/detail?id=${id}`,
+    initialAccessTokens: "/management/initial-access-tokens",
     keys: "/management/keys",
     incidents: "/management/incidents",
     federationProviders: "/management/federation-providers",

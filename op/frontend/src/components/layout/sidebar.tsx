@@ -9,6 +9,7 @@ const navItems = [
   { href: routes.management.root, label: "ダッシュボード" },
   { href: routes.management.tenants, label: "テナント" },
   { href: routes.management.clients, label: "クライアント" },
+  { href: routes.management.initialAccessTokens, label: "IAT 管理" },
   { href: routes.management.keys, label: "署名鍵" },
   { href: routes.management.federationProviders, label: "IdP 連携" },
   { href: routes.management.incidents, label: "インシデント" },

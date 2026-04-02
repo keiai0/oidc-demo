@@ -20,6 +20,11 @@ export const queryKeys = {
     all: ["keys"] as const,
     list: () => ["keys", "list"] as const,
   },
+  initialAccessTokens: {
+    all: ["initial-access-tokens"] as const,
+    listByTenant: (tenantId: string) =>
+      ["initial-access-tokens", "list", { tenantId }] as const,
+  },
   federationProviders: {
     all: ["federation-providers"] as const,
     listByTenant: (tenantId: string) =>
