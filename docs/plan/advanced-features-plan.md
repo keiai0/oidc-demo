@@ -270,20 +270,20 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 ### 15-1. データモデル
 
-- [ ] `client_registrations` テーブルの作成
+- [x] `client_registrations` テーブルの作成
   - `id`, `client_id`（FK）, `registration_access_token_hash`, `registration_client_uri`
   - `software_id`, `software_version`, `software_statement`
   - `initial_access_token_id`（どの IAT で登録されたか追跡）
   - `created_at`, `updated_at`
-- [ ] `initial_access_tokens` テーブルの作成
+- [x] `initial_access_tokens` テーブルの作成
   - 管理者が発行する、登録を許可するためのトークン
   - `id`, `token_hash`, `tenant_id`, `max_registrations`, `used_count`, `expires_at`
 
 ### 15-2. Registration Endpoint（RFC 7591）
 
-- [ ] `POST /{tenant_code}/register` の実装
+- [x] `POST /{tenant_code}/register` の実装
   - **仕様参照:** RFC 7591 Section 3.1（Client Registration Request）
-- [ ] リクエストパラメータの処理
+- [x] リクエストパラメータの処理
   - `redirect_uris`: リダイレクト URI の配列
   - `token_endpoint_auth_method`: クライアント認証方式（デフォルト: `client_secret_basic`）
   - `grant_types`: 許可する grant type の配列
@@ -298,7 +298,7 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
   - `software_id`: ソフトウェア識別子
   - `software_version`: バージョン文字列
   - `software_statement`: ソフトウェアステートメント JWT
-- [ ] メタデータバリデーション
+- [x] メタデータバリデーション
   - `redirect_uris` の形式検証（HTTPS 必須、localhost 例外）
   - `grant_types` と `response_types` の整合性チェック
   - `token_endpoint_auth_method` がサポートされているか
@@ -306,7 +306,7 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
   - JWT 署名の検証（信頼する発行者の公開鍵で）
   - `software_id` の一致確認
   - ステートメント内のメタデータとリクエストの整合性
-- [ ] レスポンス（HTTP 201 Created）
+- [x] レスポンス（HTTP 201 Created）
   - `client_id`: 発行されたクライアント ID
   - `client_secret`: 発行されたクライアントシークレット（confidential client の場合）
   - `client_id_issued_at`: 発行日時（UNIX タイムスタンプ）
@@ -314,10 +314,10 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
   - `registration_access_token`: 管理用トークン
   - `registration_client_uri`: クライアント設定エンドポイント URL
   - 登録されたメタデータの全フィールド
-- [ ] Initial Access Token による認可
+- [x] Initial Access Token による認可
   - Bearer トークンが必要（管理者が事前発行）
   - トークンの有効期限・使用回数の検証
-- [ ] エラーレスポンス
+- [x] エラーレスポンス
   - `invalid_redirect_uri`: 無効なリダイレクト URI
   - `invalid_client_metadata`: 不正なメタデータ
   - `invalid_software_statement`: ソフトウェアステートメント検証失敗
@@ -325,33 +325,33 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 ### 15-3. Client Configuration Endpoint（RFC 7592）
 
-- [ ] `GET /{tenant_code}/register/{client_id}` の実装（クライアント情報取得）
+- [x] `GET /{tenant_code}/register/{client_id}` の実装（クライアント情報取得）
   - Registration Access Token で認証
   - 現在のクライアントメタデータを返却
-- [ ] `PUT /{tenant_code}/register/{client_id}` の実装（クライアント更新）
+- [x] `PUT /{tenant_code}/register/{client_id}` の実装（クライアント更新）
   - **仕様参照:** RFC 7592 Section 2.2
   - 全フィールドの送信が必要（差分更新ではない）
   - `client_id` は変更不可
   - Registration Access Token のローテーション（MAY → 実装する）
-- [ ] `DELETE /{tenant_code}/register/{client_id}` の実装（クライアント削除）
+- [x] `DELETE /{tenant_code}/register/{client_id}` の実装（クライアント削除）
   - HTTP 204 No Content
   - 関連するトークン・認可コードも失効させる
 
 ### 15-4. Discovery エンドポイントの更新
 
-- [ ] `registration_endpoint` を discovery レスポンスに追加
+- [x] `registration_endpoint` を discovery レスポンスに追加
   - **仕様参照:** OIDC Discovery 1.0 Section 3
 
 ### 15-5. 管理 API（Initial Access Token 管理）
 
-- [ ] `POST /management/v1/tenants/:tenant_id/initial-access-tokens` — IAT 発行
-- [ ] `GET /management/v1/tenants/:tenant_id/initial-access-tokens` — IAT 一覧
-- [ ] `DELETE /management/v1/initial-access-tokens/:id` — IAT 無効化
-- [ ] OP Frontend に IAT 管理画面を追加
+- [x] `POST /management/v1/tenants/:tenant_id/initial-access-tokens` — IAT 発行
+- [x] `GET /management/v1/tenants/:tenant_id/initial-access-tokens` — IAT 一覧
+- [x] `DELETE /management/v1/initial-access-tokens/:id` — IAT 無効化
+- [x] OP Frontend に IAT 管理画面を追加
 
 ### 15-6. RP での動作検証
 
-- [ ] RP に Dynamic Registration デモページを追加
+- [x] RP に Dynamic Registration デモページを追加
   - IAT を入力して自動登録を実行
   - 登録結果（client_id, client_secret）の表示
   - 登録したクライアントで認証フローを実行
