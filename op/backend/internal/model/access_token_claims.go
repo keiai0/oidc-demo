@@ -16,23 +16,25 @@ type ActClaim struct {
 }
 
 type AccessTokenClaims struct {
-	Issuer       string
-	Subject      string
-	Audience     string
-	Scope        string
-	SessionID    string
-	Confirmation *TokenConfirmation // DPoP: cnf.jkt
-	Act          *ActClaim          // RFC 8693: delegation chain
+	Issuer               string
+	Subject              string
+	Audience             string
+	Scope                string
+	SessionID            string
+	Confirmation         *TokenConfirmation  // DPoP: cnf.jkt
+	Act                  *ActClaim           // RFC 8693: delegation chain
+	AuthorizationDetails []AuthorizationDetail // RFC 9396: rich authorization requests
 }
 
 // AccessTokenResult はアクセストークン検証結果。
 // Subject は pairwise sub (base64url hash) や client_credentials (client_id) の場合もあるため string。
 type AccessTokenResult struct {
-	JTI       string
-	Subject   string
-	ClientID  string
-	Scope     string
-	SessionID *uuid.UUID // nil for client_credentials grant
-	DPoPJKT   *string    // DPoP: cnf.jkt from token
-	Act       *ActClaim  // RFC 8693: delegation chain (nil if not a delegated token)
+	JTI                  string
+	Subject              string
+	ClientID             string
+	Scope                string
+	SessionID            *uuid.UUID          // nil for client_credentials grant
+	DPoPJKT              *string             // DPoP: cnf.jkt from token
+	Act                  *ActClaim           // RFC 8693: delegation chain (nil if not a delegated token)
+	AuthorizationDetails []AuthorizationDetail // RFC 9396: rich authorization requests (nil if not present)
 }
