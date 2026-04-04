@@ -113,6 +113,11 @@ func (s *TokenService) SignAccessToken(ctx context.Context, claims *model.Access
 		builder = builder.Claim("act", claims.Act)
 	}
 
+	// Rich Authorization Requests: authorization_details クレーム (RFC 9396 Section 9)
+	if len(claims.AuthorizationDetails) > 0 {
+		builder = builder.Claim("authorization_details", claims.AuthorizationDetails)
+	}
+
 	token, err := builder.Build()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to build access token: %w", err)
@@ -191,14 +196,22 @@ func (s *TokenService) ValidateAccessToken(ctx context.Context, tokenString stri
 		act = parseActClaim(actRaw)
 	}
 
+	// Rich Authorization Requests: authorization_details クレーム抽出 (RFC 9396)
+	var authDetails []model.AuthorizationDetail
+	var authDetailsRaw []interface{}
+	if err := token.Get("authorization_details", &authDetailsRaw); err == nil {
+		authDetails = parseAuthorizationDetails(authDetailsRaw)
+	}
+
 	return &model.AccessTokenResult{
-		JTI:       jti,
-		Subject:   sub,
-		ClientID:  clientID,
-		Scope:     scope,
-		SessionID: sessionID,
-		DPoPJKT:   dpopJKT,
-		Act:       act,
+		JTI:                  jti,
+		Subject:              sub,
+		ClientID:             clientID,
+		Scope:                scope,
+		SessionID:            sessionID,
+		DPoPJKT:              dpopJKT,
+		Act:                  act,
+		AuthorizationDetails: authDetails,
 	}, nil
 }
 
@@ -256,6 +269,62 @@ func parseActClaim(raw map[string]interface{}) *model.ActClaim {
 		act.Act = parseActClaim(nested)
 	}
 	return act
+}
+
+// parseAuthorizationDetails は []interface{} を []AuthorizationDetail に変換する。
+func parseAuthorizationDetails(raw []interface{}) []model.AuthorizationDetail {
+	if len(raw) == 0 {
+		return nil
+	}
+	details := make([]model.AuthorizationDetail, 0, len(raw))
+	for _, item := range raw {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		detail := model.AuthorizationDetail{
+			Extra: make(map[string]interface{}),
+		}
+		commonFields := map[string]bool{
+			"type": true, "locations": true, "actions": true,
+			"datatypes": true, "identifier": true, "privileges": true,
+		}
+		if t, ok := m["type"].(string); ok {
+			detail.Type = t
+		}
+		if id, ok := m["identifier"].(string); ok {
+			detail.Identifier = id
+		}
+		detail.Locations = toStringSliceFromInterface(m["locations"])
+		detail.Actions = toStringSliceFromInterface(m["actions"])
+		detail.DataTypes = toStringSliceFromInterface(m["datatypes"])
+		detail.Privileges = toStringSliceFromInterface(m["privileges"])
+		for k, v := range m {
+			if !commonFields[k] {
+				detail.Extra[k] = v
+			}
+		}
+		details = append(details, detail)
+	}
+	return details
+}
+
+// toStringSliceFromInterface は interface{} を []string に変換する。
+func toStringSliceFromInterface(v interface{}) []string {
+	if v == nil {
+		return nil
+	}
+	arr, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(arr))
+	for _, item := range arr {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 // ComputeATHash は at_hash を計算する (OIDC Core 1.0 Section 3.1.3.6)
