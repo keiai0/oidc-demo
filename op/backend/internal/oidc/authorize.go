@@ -17,15 +17,16 @@ import (
 )
 
 type AuthorizeHandler struct {
-	tenantFinder        TenantFinder
-	clientFinder        ClientFinder
-	tenantClientChecker TenantClientChecker
-	authCodeStore       AuthorizationCodeStore
-	consentStore        ConsentStore
-	sessionValidator    SessionValidator
-	parStore            PARStore
-	loginPageURL        string
-	demoMode            bool
+	tenantFinder           TenantFinder
+	clientFinder           ClientFinder
+	tenantClientChecker    TenantClientChecker
+	authCodeStore          AuthorizationCodeStore
+	consentStore           ConsentStore
+	sessionValidator       SessionValidator
+	parStore               PARStore
+	authDetailTypeFinder   AuthorizationDetailTypeFinder
+	loginPageURL           string
+	demoMode               bool
 }
 
 func NewAuthorizeHandler(
@@ -36,19 +37,21 @@ func NewAuthorizeHandler(
 	consentStore ConsentStore,
 	sessionValidator SessionValidator,
 	parStore PARStore,
+	authDetailTypeFinder AuthorizationDetailTypeFinder,
 	loginPageURL string,
 	demoMode bool,
 ) *AuthorizeHandler {
 	return &AuthorizeHandler{
-		tenantFinder:        tenantFinder,
-		clientFinder:        clientFinder,
-		tenantClientChecker: tenantClientChecker,
-		authCodeStore:       authCodeStore,
-		consentStore:        consentStore,
-		sessionValidator:    sessionValidator,
-		parStore:            parStore,
-		loginPageURL:        loginPageURL,
-		demoMode:            demoMode,
+		tenantFinder:         tenantFinder,
+		clientFinder:         clientFinder,
+		tenantClientChecker:  tenantClientChecker,
+		authCodeStore:        authCodeStore,
+		consentStore:         consentStore,
+		sessionValidator:     sessionValidator,
+		parStore:             parStore,
+		authDetailTypeFinder: authDetailTypeFinder,
+		loginPageURL:         loginPageURL,
+		demoMode:             demoMode,
 	}
 }
 
@@ -69,7 +72,7 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 
 	// PAR (RFC 9126): request_uri パラメータの処理
 	requestURI := c.QueryParam("request_uri")
-	var responseType, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod, prompt, maxAgeStr, acrValuesStr, claimsParam string
+	var responseType, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod, prompt, maxAgeStr, acrValuesStr, claimsParam, authorizationDetailsParam string
 
 	if requestURI != "" {
 		// request_uri が指定されている場合、他のパラメータは client_id 以外禁止 (RFC 9126 Section 4)
@@ -118,6 +121,7 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		maxAgeStr = params["max_age"]
 		acrValuesStr = params["acr_values"]
 		claimsParam = params["claims"]
+		authorizationDetailsParam = params["authorization_details"]
 
 		// PAR 解決後: リクエスト URL を通常パラメータに書き換える。
 		// ログイン後のリダイレクト先（redirect_after_login）が request_uri ではなく
@@ -143,6 +147,7 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		maxAgeStr = c.QueryParam("max_age")
 		acrValuesStr = c.QueryParam("acr_values")
 		claimsParam = c.QueryParam("claims")
+		authorizationDetailsParam = c.QueryParam("authorization_details")
 	}
 
 	// prompt パラメータ解析・検証 (OIDC Core 1.0 Section 3.1.2.1)
@@ -298,13 +303,24 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		if hasPrompt(prompts, "none") {
 			return errorRedirect(c, redirectURI, state, "consent_required", "")
 		}
-		return h.redirectToConsent(c, tenantCode, client.ID.String(), client.Name, scope)
+		return h.redirectToConsent(c, tenantCode, client.ID.String(), client.Name, scope, authorizationDetailsParam)
 	}
 
 	// claims パラメータの検証 (OIDC Core 1.0 Section 5.5)
 	if claimsParam != "" {
 		if _, err := ParseClaimsRequest(claimsParam); err != nil {
 			return errorRedirect(c, redirectURI, state, "invalid_request", "invalid claims parameter")
+		}
+	}
+
+	// authorization_details パラメータの検証 (RFC 9396 Section 2)
+	if authorizationDetailsParam != "" {
+		parsedDetails, err := ParseAuthorizationDetails(authorizationDetailsParam)
+		if err != nil {
+			return errorRedirect(c, redirectURI, state, "invalid_request", "invalid authorization_details: "+err.Error())
+		}
+		if err := ValidateAuthorizationDetails(ctx, parsedDetails, tenant.ID, h.authDetailTypeFinder); err != nil {
+			return errorRedirect(c, redirectURI, state, "invalid_request", err.Error())
 		}
 	}
 
@@ -331,6 +347,10 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 	if claimsParam != "" {
 		claimsParamPtr = &claimsParam
 	}
+	var authDetailsPtr *string
+	if authorizationDetailsParam != "" {
+		authDetailsPtr = &authorizationDetailsParam
+	}
 
 	authCode := &model.AuthorizationCode{
 		SessionID:           session.ID,
@@ -339,10 +359,11 @@ func (h *AuthorizeHandler) Handle(c echo.Context) error {
 		RedirectURI:         redirectURI,
 		Scope:               scope,
 		Nonce:               noncePtr,
-		CodeChallenge:       challengePtr,
+		CodeChallenge:        challengePtr,
 		CodeChallengeMethod: methodPtr,
 		ClaimsParam:         claimsParamPtr,
-		ExpiresAt:           time.Now().Add(time.Duration(tenant.AuthCodeLifetime) * time.Second),
+		AuthorizationDetails: authDetailsPtr,
+		ExpiresAt:            time.Now().Add(time.Duration(tenant.AuthCodeLifetime) * time.Second),
 	}
 
 	if err := h.authCodeStore.Create(ctx, authCode); err != nil {
@@ -416,7 +437,7 @@ func (h *AuthorizeHandler) redirectToMFA(c echo.Context, tenantCode string) erro
 
 // redirectToConsent は同意画面にリダイレクトする。
 // ログインリダイレクトと同じパターンで、authorize URL 全体を保存する。
-func (h *AuthorizeHandler) redirectToConsent(c echo.Context, tenantCode, clientID, clientName, scope string) error {
+func (h *AuthorizeHandler) redirectToConsent(c echo.Context, tenantCode, clientID, clientName, scope, authorizationDetails string) error {
 	consentURL, err := url.Parse(h.loginPageURL + "/consent")
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "server_error"})
@@ -428,6 +449,9 @@ func (h *AuthorizeHandler) redirectToConsent(c echo.Context, tenantCode, clientI
 	q.Set("client_name", clientName)
 	q.Set("scope", scope)
 	q.Set("redirect_after_consent", c.Request().URL.String())
+	if authorizationDetails != "" {
+		q.Set("authorization_details", authorizationDetails)
+	}
 	consentURL.RawQuery = q.Encode()
 
 	return c.Redirect(http.StatusFound, consentURL.String())

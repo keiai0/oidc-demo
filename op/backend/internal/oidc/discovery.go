@@ -7,14 +7,16 @@ import (
 )
 
 type DiscoveryHandler struct {
-	issuerBaseURL string
-	tenantFinder  TenantFinder
+	issuerBaseURL        string
+	tenantFinder         TenantFinder
+	authDetailTypeFinder AuthorizationDetailTypeFinder
 }
 
-func NewDiscoveryHandler(issuerBaseURL string, tenantFinder TenantFinder) *DiscoveryHandler {
+func NewDiscoveryHandler(issuerBaseURL string, tenantFinder TenantFinder, authDetailTypeFinder AuthorizationDetailTypeFinder) *DiscoveryHandler {
 	return &DiscoveryHandler{
-		issuerBaseURL: issuerBaseURL,
-		tenantFinder:  tenantFinder,
+		issuerBaseURL:        issuerBaseURL,
+		tenantFinder:         tenantFinder,
+		authDetailTypeFinder: authDetailTypeFinder,
 	}
 }
 
@@ -63,6 +65,18 @@ func (h *DiscoveryHandler) Handle(c echo.Context) error {
 		"userinfo_signing_alg_values_supported":            []string{"RS256"},
 		"claims_parameter_supported":                       true,
 		"claims_supported":                                 []string{"sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "acr", "amr", "sid", "name", "email", "email_verified", "updated_at"},
+	}
+
+	// RFC 9396 Section 9: authorization_details_types_supported
+	if h.authDetailTypeFinder != nil {
+		adTypes, err := h.authDetailTypeFinder.ListByTenantID(c.Request().Context(), tenant.ID)
+		if err == nil && len(adTypes) > 0 {
+			typeNames := make([]string, 0, len(adTypes))
+			for _, t := range adTypes {
+				typeNames = append(typeNames, t.TypeName)
+			}
+			metadata["authorization_details_types_supported"] = typeNames
+		}
 	}
 
 	c.Response().Header().Set("Cache-Control", "public, max-age=86400")

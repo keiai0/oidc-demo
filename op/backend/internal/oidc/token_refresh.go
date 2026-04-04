@@ -103,14 +103,21 @@ func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *
 		return nil, ErrInvalidGrant
 	}
 
+	// authorization_details を前のアクセストークンから引き継ぐ (RFC 9396 Section 7)
+	var authDetails []model.AuthorizationDetail
+	if rt.AccessToken.AuthorizationDetails != nil {
+		authDetails, _ = ParseAuthorizationDetails(*rt.AccessToken.AuthorizationDetails)
+	}
+
 	// 新しいアクセストークン生成
 	accessTokenLifetime := time.Duration(tenant.AccessTokenLifetime) * time.Second
 	atClaims := &model.AccessTokenClaims{
-		Issuer:    issuer,
-		Subject:   userID,
-		Audience:  client.ClientID,
-		Scope:     scope,
-		SessionID: rt.SessionID.String(),
+		Issuer:               issuer,
+		Subject:              userID,
+		Audience:             client.ClientID,
+		Scope:                scope,
+		SessionID:            rt.SessionID.String(),
+		AuthorizationDetails: authDetails,
 	}
 	if dpopJKT != "" {
 		atClaims.Confirmation = &model.TokenConfirmation{JKT: dpopJKT}
@@ -121,11 +128,12 @@ func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *
 	}
 
 	accessToken := &model.AccessToken{
-		JTI:       accessJTI,
-		SessionID: &rt.SessionID,
-		ClientID:  client.ID,
-		Scope:     scope,
-		ExpiresAt: time.Now().Add(accessTokenLifetime),
+		JTI:                  accessJTI,
+		SessionID:            &rt.SessionID,
+		ClientID:             client.ID,
+		Scope:                scope,
+		AuthorizationDetails: rt.AccessToken.AuthorizationDetails,
+		ExpiresAt:            time.Now().Add(accessTokenLifetime),
 	}
 	if dpopJKT != "" {
 		accessToken.DPoPJKT = &dpopJKT
@@ -176,11 +184,18 @@ func (h *TokenHandler) handleRefreshTokenGrantLogic(ctx context.Context, input *
 		tokenType = "DPoP"
 	}
 
-	return &TokenResponse{
+	resp := &TokenResponse{
 		AccessToken:  accessTokenStr,
 		TokenType:    tokenType,
 		ExpiresIn:    tenant.AccessTokenLifetime,
 		RefreshToken: newRefreshTokenStr,
 		Scope:        scope,
-	}, nil
+	}
+
+	// RFC 9396 Section 7: authorization_details をトークンレスポンスに含める
+	if len(authDetails) > 0 {
+		resp.AuthorizationDetails = authDetails
+	}
+
+	return resp, nil
 }

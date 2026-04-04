@@ -20,12 +20,13 @@ type AuthCodeGrantInput struct {
 
 // TokenResponse はトークンレスポンス
 type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	IDToken      string `json:"id_token,omitempty"`
-	Scope        string `json:"scope"`
+	AccessToken          string      `json:"access_token"`
+	TokenType            string      `json:"token_type"`
+	ExpiresIn            int         `json:"expires_in"`
+	RefreshToken         string      `json:"refresh_token,omitempty"`
+	IDToken              string      `json:"id_token,omitempty"`
+	Scope                string      `json:"scope"`
+	AuthorizationDetails interface{} `json:"authorization_details,omitempty"`
 }
 
 // handleAuthCodeGrantLogic は認可コードグラントのビジネスロジック
@@ -111,14 +112,25 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 		}
 	}
 
+	// authorization_details の解析 (RFC 9396 Section 7)
+	var authDetails []model.AuthorizationDetail
+	if authCode.AuthorizationDetails != nil {
+		var err error
+		authDetails, err = ParseAuthorizationDetails(*authCode.AuthorizationDetails)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse authorization_details: %w", err)
+		}
+	}
+
 	// アクセストークン生成
 	accessTokenLifetime := time.Duration(tenant.AccessTokenLifetime) * time.Second
 	atClaims := &model.AccessTokenClaims{
-		Issuer:    issuer,
-		Subject:   userID,
-		Audience:  client.ClientID,
-		Scope:     authCode.Scope,
-		SessionID: authCode.SessionID.String(),
+		Issuer:               issuer,
+		Subject:              userID,
+		Audience:             client.ClientID,
+		Scope:                authCode.Scope,
+		SessionID:            authCode.SessionID.String(),
+		AuthorizationDetails: authDetails,
 	}
 	// DPoP: cnf.jkt クレームを含める (RFC 9449 Section 6.1)
 	if input.DPoPJKT != "" {
@@ -131,12 +143,13 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 
 	// アクセストークンDB保存（claims_param を userinfo で使用するためコピー）
 	accessToken := &model.AccessToken{
-		JTI:         accessJTI,
-		SessionID:   &authCode.SessionID,
-		ClientID:    client.ID,
-		Scope:       authCode.Scope,
-		ClaimsParam: authCode.ClaimsParam,
-		ExpiresAt:   time.Now().Add(accessTokenLifetime),
+		JTI:                  accessJTI,
+		SessionID:            &authCode.SessionID,
+		ClientID:             client.ID,
+		Scope:                authCode.Scope,
+		ClaimsParam:          authCode.ClaimsParam,
+		AuthorizationDetails: authCode.AuthorizationDetails,
+		ExpiresAt:            time.Now().Add(accessTokenLifetime),
 	}
 	if input.DPoPJKT != "" {
 		accessToken.DPoPJKT = &input.DPoPJKT
@@ -229,12 +242,19 @@ func (h *TokenHandler) handleAuthCodeGrantLogic(ctx context.Context, input *Auth
 		tokenType = "DPoP"
 	}
 
-	return &TokenResponse{
+	resp := &TokenResponse{
 		AccessToken:  accessTokenStr,
 		TokenType:    tokenType,
 		ExpiresIn:    tenant.AccessTokenLifetime,
 		RefreshToken: refreshTokenStr,
 		IDToken:      idTokenStr,
 		Scope:        authCode.Scope,
-	}, nil
+	}
+
+	// RFC 9396 Section 7: authorization_details をトークンレスポンスに含める
+	if len(authDetails) > 0 {
+		resp.AuthorizationDetails = authDetails
+	}
+
+	return resp, nil
 }

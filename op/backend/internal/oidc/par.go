@@ -131,6 +131,7 @@ func (h *PARHandler) Handle(c echo.Context) error {
 		"max_age":               c.FormValue("max_age"),
 		"acr_values":            c.FormValue("acr_values"),
 		"claims":                c.FormValue("claims"),
+		"authorization_details": c.FormValue("authorization_details"),
 	}
 
 	paramsJSON, err := json.Marshal(params)

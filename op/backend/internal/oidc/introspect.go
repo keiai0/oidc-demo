@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -110,7 +111,7 @@ func (h *IntrospectHandler) introspectAccessToken(ctx context.Context, tokenStri
 		return nil
 	}
 
-	return map[string]interface{}{
+	resp := map[string]interface{}{
 		"active":     true,
 		"scope":      result.Scope,
 		"client_id":  result.ClientID,
@@ -118,6 +119,16 @@ func (h *IntrospectHandler) introspectAccessToken(ctx context.Context, tokenStri
 		"exp":        dbToken.ExpiresAt.Unix(),
 		"token_type": "Bearer",
 	}
+
+	// RFC 9396 Section 9: authorization_details を introspection レスポンスに含める
+	if dbToken.AuthorizationDetails != nil {
+		var authDetails interface{}
+		if err := json.Unmarshal([]byte(*dbToken.AuthorizationDetails), &authDetails); err == nil {
+			resp["authorization_details"] = authDetails
+		}
+	}
+
+	return resp
 }
 
 func (h *IntrospectHandler) introspectRefreshToken(ctx context.Context, tokenString string) map[string]interface{} {

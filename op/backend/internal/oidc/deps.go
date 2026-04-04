@@ -186,6 +186,14 @@ type RedirectURICreator interface {
 	DeleteByClientID(ctx context.Context, clientDBID uuid.UUID) error
 }
 
+// AuthorizationDetailTypeFinder は認可詳細タイプの検索を定義する (RFC 9396)。
+type AuthorizationDetailTypeFinder interface {
+	// FindByTenantIDAndType はテナント ID とタイプ名で認可詳細タイプを検索する。見つからなければ (nil, nil)。
+	FindByTenantIDAndType(ctx context.Context, tenantID uuid.UUID, typeName string) (*model.AuthorizationDetailType, error)
+	// ListByTenantID はテナントに属する認可詳細タイプの一覧を返す。
+	ListByTenantID(ctx context.Context, tenantID uuid.UUID) ([]model.AuthorizationDetailType, error)
+}
+
 type (
 	VerifyPasswordFunc      func(password, hash string) (bool, error)
 	VerifyCodeChallengeFunc func(verifier, challenge string) bool
