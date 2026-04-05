@@ -273,8 +273,9 @@ func setupServer(db *gorm.DB) *httptest.Server {
 
 	// issuerBaseURL が確定したので OIDC ハンドラを初期化
 	jwksHandler := oidc.NewJWKSHandler(keySvc)
-	discoveryHandler := oidc.NewDiscoveryHandler(baseURL, tenantRepo)
-	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, userConsentRepo, authSvc, parRepo, "http://localhost:3000", false)
+	authDetailTypeRepo := store.NewAuthorizationDetailTypeRepository(db)
+	discoveryHandler := oidc.NewDiscoveryHandler(baseURL, tenantRepo, authDetailTypeRepo)
+	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, userConsentRepo, authSvc, parRepo, authDetailTypeRepo, "http://localhost:3000", false)
 	parHandler := oidc.NewPARHandler(clientRepo, tenantRepo, tenantClientRepo, parRepo, crypto.VerifyPassword)
 	tokenHandler := oidc.NewTokenHandler(
 		authCodeRepo, accessTokenRepo, refreshTokenRepo, idTokenRepo,

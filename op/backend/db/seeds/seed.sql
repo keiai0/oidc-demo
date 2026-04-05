@@ -91,6 +91,25 @@ INSERT INTO token_exchange_policies (id, client_id, allowed_subject_token_types,
      true)
 ON CONFLICT (client_id) DO NOTHING;
 
+-- Rich Authorization Requests (RFC 9396) デモ用認可詳細タイプ
+INSERT INTO authorization_detail_types (id, tenant_id, type_name, description, allowed_actions, allowed_locations) VALUES
+    ('f2000000-0000-0000-0000-000000000001',
+     'a0000000-0000-0000-0000-000000000001',
+     'payment_initiation',
+     '送金指示: 指定口座から送金を開始する権限',
+     '["initiate", "status"]',
+     '[]')
+ON CONFLICT (tenant_id, type_name) DO NOTHING;
+
+INSERT INTO authorization_detail_types (id, tenant_id, type_name, description, allowed_actions, allowed_locations) VALUES
+    ('f2000000-0000-0000-0000-000000000002',
+     'a0000000-0000-0000-0000-000000000001',
+     'account_information',
+     '口座情報照会: 口座の残高・取引履歴を閲覧する権限',
+     '["read", "list"]',
+     '["https://example.com/accounts"]')
+ON CONFLICT (tenant_id, type_name) DO NOTHING;
+
 -- 開発用管理ユーザー (admin / admin)
 INSERT INTO admin_users (id, login_id, password_hash, name, status) VALUES
     ('f0000000-0000-0000-0000-000000000001', 'admin', '$argon2id$v=19$m=65536,t=3,p=4$Uo9ePSD5eq6LtwxkBckU7Q$IfMdE7Ae3M+KxlgYyAFouY5jVeoZ7q4XOM7ZkYQoSdg', 'Administrator', 'active')

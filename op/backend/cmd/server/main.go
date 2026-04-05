@@ -205,6 +205,9 @@ func main() {
 	// Token Exchange (RFC 8693) Store 初期化
 	tokenExchangePolicyRepo := store.NewTokenExchangePolicyRepository(db)
 
+	// Rich Authorization Requests (RFC 9396) Store 初期化
+	authDetailTypeRepo := store.NewAuthorizationDetailTypeRepository(db)
+
 	// Dynamic Client Registration (RFC 7591/7592) Store 初期化
 	iatRepo := store.NewInitialAccessTokenRepository(db)
 	clientRegRepo := store.NewClientRegistrationRepository(db)
@@ -216,8 +219,8 @@ func main() {
 
 	// OIDC ハンドラ初期化
 	jwksHandler := oidc.NewJWKSHandler(keySvc)
-	discoveryHandler := oidc.NewDiscoveryHandler(cfg.BaseURL, tenantRepo)
-	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, userConsentRepo, authSvc, parRepo, cfg.FrontendBaseURL, cfg.DemoMode)
+	discoveryHandler := oidc.NewDiscoveryHandler(cfg.BaseURL, tenantRepo, authDetailTypeRepo)
+	authorizeHandler := oidc.NewAuthorizeHandler(tenantRepo, clientRepo, tenantClientRepo, authCodeRepo, userConsentRepo, authSvc, parRepo, authDetailTypeRepo, cfg.FrontendBaseURL, cfg.DemoMode)
 	parHandler := oidc.NewPARHandler(clientRepo, tenantRepo, tenantClientRepo, parRepo, crypto.VerifyPassword)
 	tokenHandler := oidc.NewTokenHandler(
 		authCodeRepo, accessTokenRepo, refreshTokenRepo, idTokenRepo,
@@ -431,6 +434,13 @@ func main() {
 	mgmtGroup.GET("/clients/:id/token-exchange-policy", tokenExchangePolicyMgmtHandler.HandleGet)
 	mgmtGroup.PUT("/clients/:id/token-exchange-policy", tokenExchangePolicyMgmtHandler.HandleCreateOrUpdate)
 	mgmtGroup.DELETE("/clients/:id/token-exchange-policy", tokenExchangePolicyMgmtHandler.HandleDelete)
+
+	authDetailTypeMgmtHandler := management.NewAuthorizationDetailTypeHandler(authDetailTypeRepo)
+	mgmtGroup.GET("/tenants/:tenant_id/authorization-detail-types", authDetailTypeMgmtHandler.HandleList)
+	mgmtGroup.POST("/tenants/:tenant_id/authorization-detail-types", authDetailTypeMgmtHandler.HandleCreate)
+	mgmtGroup.GET("/authorization-detail-types/:id", authDetailTypeMgmtHandler.HandleGet)
+	mgmtGroup.PUT("/authorization-detail-types/:id", authDetailTypeMgmtHandler.HandleUpdate)
+	mgmtGroup.DELETE("/authorization-detail-types/:id", authDetailTypeMgmtHandler.HandleDelete)
 
 	iatMgmtHandler := management.NewInitialAccessTokenHandler(iatRepo, tenantRepo, jwt.SHA256Hex)
 	mgmtGroup.POST("/tenants/:tenant_id/initial-access-tokens", iatMgmtHandler.HandleCreate)
