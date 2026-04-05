@@ -12,6 +12,7 @@ const navItems = [
   { href: routes.management.initialAccessTokens, label: "IAT 管理" },
   { href: routes.management.keys, label: "署名鍵" },
   { href: routes.management.federationProviders, label: "IdP 連携" },
+  { href: routes.management.authorizationDetailTypes, label: "認可詳細タイプ" },
   { href: routes.management.incidents, label: "インシデント" },
 ];
 

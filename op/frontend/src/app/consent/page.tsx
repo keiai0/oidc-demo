@@ -12,10 +12,34 @@ const scopeDescriptions: Record<string, string> = {
   offline_access: "オフラインアクセス（長期間のトークン更新）",
 };
 
+// RFC 9396 の標準フィールド名の日本語ラベル
+const rarFieldLabels: Record<string, string> = {
+  actions: "操作",
+  locations: "リソースの場所",
+  identifier: "識別子",
+  datatypes: "データ種別",
+  privileges: "権限",
+};
+
+// RFC 9396 の標準フィールド（type 以外）。これ以外は追加フィールドとして表示
+const rarStandardFields = new Set(["type", "actions", "locations", "identifier", "datatypes", "privileges"]);
+
+// authorization_details の1要素の型
+interface AuthorizationDetail {
+  type: string;
+  actions?: string[];
+  locations?: string[];
+  identifier?: string;
+  datatypes?: string[];
+  privileges?: string[];
+  [key: string]: unknown;
+}
+
 export default function ConsentPage() {
   const [clientId, setClientId] = useState("");
   const [clientName, setClientName] = useState("");
   const [scopes, setScopes] = useState<string[]>([]);
+  const [authorizationDetails, setAuthorizationDetails] = useState<AuthorizationDetail[]>([]);
   const [redirectAfterConsent, setRedirectAfterConsent] = useState("");
   const [redirectURI, setRedirectURI] = useState("");
   const [state, setState] = useState("");
@@ -38,6 +62,19 @@ export default function ConsentPage() {
     setClientId(params.get("client_id") || "");
     setRedirectURI(params.get("redirect_uri") || "");
     setState(params.get("state") || "");
+
+    // RFC 9396: authorization_details は URL エンコードされた JSON 配列
+    const adParam = params.get("authorization_details");
+    if (adParam) {
+      try {
+        const parsed = JSON.parse(adParam);
+        if (Array.isArray(parsed)) {
+          setAuthorizationDetails(parsed);
+        }
+      } catch {
+        // パース失敗時は無視（authorization_details なしとして扱う）
+      }
+    }
   }, []);
 
   async function handleConsent(approved: boolean) {
@@ -127,6 +164,71 @@ export default function ConsentPage() {
             </div>
           ))}
         </div>
+
+        {authorizationDetails.length > 0 && (
+          <div className="mb-6 space-y-3">
+            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+              詳細な認可要求（Rich Authorization Requests）
+            </p>
+            {authorizationDetails.map((detail, index) => (
+              <div
+                key={index}
+                className="p-3 bg-amber-50 rounded border border-amber-200"
+              >
+                <div className="flex items-center mb-2">
+                  <svg
+                    className="w-5 h-5 text-amber-500 mr-3 flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <p className="text-sm font-medium text-gray-700">
+                    {detail.type}
+                  </p>
+                </div>
+                <div className="ml-8 space-y-1">
+                  {/* 標準フィールド（type 以外） */}
+                  {(["actions", "locations", "datatypes", "privileges"] as const).map(
+                    (field) => {
+                      const value = detail[field];
+                      if (!value || !Array.isArray(value) || value.length === 0) return null;
+                      return (
+                        <div key={field} className="text-xs text-gray-600">
+                          <span className="font-medium">{rarFieldLabels[field]}:</span>{" "}
+                          {value.join(", ")}
+                        </div>
+                      );
+                    }
+                  )}
+                  {detail.identifier && (
+                    <div className="text-xs text-gray-600">
+                      <span className="font-medium">{rarFieldLabels.identifier}:</span>{" "}
+                      {detail.identifier}
+                    </div>
+                  )}
+                  {/* 追加フィールド（標準以外） */}
+                  {Object.entries(detail)
+                    .filter(([key]) => !rarStandardFields.has(key))
+                    .map(([key, value]) => (
+                      <div key={key} className="text-xs text-gray-600">
+                        <span className="font-medium">{key}:</span>{" "}
+                        {typeof value === "object"
+                          ? JSON.stringify(value)
+                          : String(value)}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button

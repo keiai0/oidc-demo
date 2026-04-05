@@ -31,4 +31,11 @@ export const queryKeys = {
       ["federation-providers", "list", { tenantId }] as const,
     detail: (id: string) => ["federation-providers", "detail", id] as const,
   },
+  authorizationDetailTypes: {
+    all: ["authorization-detail-types"] as const,
+    listByTenant: (tenantId: string) =>
+      ["authorization-detail-types", "list", { tenantId }] as const,
+    detail: (id: string) =>
+      ["authorization-detail-types", "detail", id] as const,
+  },
 };

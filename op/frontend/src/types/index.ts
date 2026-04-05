@@ -17,3 +17,4 @@ export type {
   InitialAccessToken,
   InitialAccessTokenCreateResponse,
 } from "./initial-access-token";
+export type { AuthorizationDetailType } from "./authorization-detail-type";

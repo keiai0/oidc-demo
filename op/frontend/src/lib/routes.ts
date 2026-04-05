@@ -21,5 +21,10 @@ export const routes = {
       `/management/federation-providers/new?tenant_id=${tenantId}`,
     federationProviderDetail: (id: string) =>
       `/management/federation-providers/detail?id=${id}`,
+    authorizationDetailTypes: "/management/authorization-detail-types",
+    authorizationDetailTypeNew: (tenantId: string) =>
+      `/management/authorization-detail-types/detail?new=true&tenant_id=${tenantId}`,
+    authorizationDetailTypeDetail: (id: string) =>
+      `/management/authorization-detail-types/detail?id=${id}`,
   },
 } as const;
