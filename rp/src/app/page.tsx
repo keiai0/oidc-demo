@@ -32,12 +32,18 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="p-4 bg-white rounded-lg shadow-md text-center">
+        <div className="p-4 bg-white rounded-lg shadow-md text-center space-y-2">
           <Link
             href="/dynamic-registration"
-            className="text-blue-600 hover:underline text-sm"
+            className="block text-blue-600 hover:underline text-sm"
           >
             Dynamic Client Registration デモ →
+          </Link>
+          <Link
+            href="/rar-demo"
+            className="block text-blue-600 hover:underline text-sm"
+          >
+            Rich Authorization Requests (RAR) デモ →
           </Link>
         </div>
 
