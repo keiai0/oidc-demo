@@ -383,80 +383,80 @@ Phase 0〜11 + セキュリティデモまで実装済み。OIDC Core / OAuth 2.
 
 ### 16-1. データモデル
 
-- [ ] `authorization_detail_types` テーブルの作成
+- [x] `authorization_detail_types` テーブルの作成
   - テナントごとにサポートする `type` を登録
   - `id`, `tenant_id`, `type_name`, `description`, `json_schema`（バリデーション用）
   - `allowed_actions`, `allowed_locations`（許可リスト）
-- [ ] `authorization_codes` テーブルに `authorization_details` カラム追加
+- [x] `authorization_codes` テーブルに `authorization_details` カラム追加
   - JSONB 型で認可要求の詳細を保存
-- [ ] `access_tokens` テーブルに `authorization_details` カラム追加
+- [x] `access_tokens` テーブルに `authorization_details` カラム追加
   - 発行されたトークンに紐づく認可詳細
 
 ### 16-2. Authorization Details の処理
 
-- [ ] `internal/oidc/rar.go` の作成
-- [ ] `authorization_details` パラメータのパース
+- [x] `internal/oidc/rar.go` の作成
+- [x] `authorization_details` パラメータのパース
   - **仕様参照:** RFC 9396 Section 2（`authorization_details` Parameter）
   - URL エンコードされた JSON 配列をパース
   - 各オブジェクトの `type` フィールドの必須チェック
-- [ ] 共通フィールドの処理（RFC 9396 Section 2 に定義）
+- [x] 共通フィールドの処理（RFC 9396 Section 2 に定義）
   - `type`（REQUIRED）: 認可詳細のタイプ識別子
   - `locations`（OPTIONAL）: リソースサーバー URI の配列
   - `actions`（OPTIONAL）: 許可するアクションの配列
   - `datatypes`（OPTIONAL）: リクエストするデータタイプの配列
   - `identifier`（OPTIONAL）: 特定リソースの識別子
   - `privileges`（OPTIONAL）: 権限レベルの配列
-- [ ] タイプごとのバリデーション
+- [x] タイプごとのバリデーション
   - `authorization_detail_types` テーブルの `json_schema` で検証
   - サポートされていない `type` → エラー
 
 ### 16-3. 認可エンドポイントへの統合
 
-- [ ] `authorize.go` に `authorization_details` 処理を追加
+- [x] `authorize.go` に `authorization_details` 処理を追加
   - `scope` と `authorization_details` の両方を受け付ける
   - 認可コードに `authorization_details` を紐づけて保存
-- [ ] 同意画面の拡張
+- [x] 同意画面の拡張
   - `authorization_details` の内容を人間が読める形式で表示
   - ユーザーが個別の authorization detail を承認/拒否できる
-- [ ] OP Frontend の同意画面を更新
+- [x] OP Frontend の同意画面を更新
   - scope に加えて authorization_details の詳細を表示
 
 ### 16-4. トークンエンドポイントへの統合
 
-- [ ] トークンレスポンスに `authorization_details` を含める
+- [x] トークンレスポンスに `authorization_details` を含める
   - **仕様参照:** RFC 9396 Section 7（Token Response）
   - AS が実際に許可した `authorization_details` を返却
   - リクエストされた内容と異なる場合がある（AS がフィルタリング）
-- [ ] トークンリクエストでの `authorization_details` 制限
+- [x] トークンリクエストでの `authorization_details` 制限
   - Refresh Token Grant 時に `authorization_details` でスコープを狭められる
 
 ### 16-5. Introspection / UserInfo への反映
 
-- [ ] Token Introspection レスポンスに `authorization_details` を含める
-- [ ] JWT アクセストークンのクレームに `authorization_details` を含める
+- [x] Token Introspection レスポンスに `authorization_details` を含める
+- [x] JWT アクセストークンのクレームに `authorization_details` を含める
 
 ### 16-6. Discovery エンドポイントの更新
 
-- [ ] `authorization_details_types_supported` を追加
+- [x] `authorization_details_types_supported` を追加
   - **仕様参照:** RFC 9396 Section 9（AS Metadata）
 
 ### 16-7. 管理 API・UI
 
-- [ ] Authorization Detail Type の CRUD API
+- [x] Authorization Detail Type の CRUD API
   - `GET /management/v1/tenants/:tenant_id/authorization-detail-types`
   - `POST /management/v1/tenants/:tenant_id/authorization-detail-types`
   - `PUT /management/v1/authorization-detail-types/:id`
   - `DELETE /management/v1/authorization-detail-types/:id`
-- [ ] OP Frontend に設定画面を追加
+- [x] OP Frontend に設定画面を追加
 
 ### 16-8. デモシナリオ（RP）
 
 金融 API を模した具体的なデモシナリオを実装し、RAR の価値を体感する。
 
-- [ ] デモ用 authorization_detail type の定義
+- [x] デモ用 authorization_detail type の定義
   - `payment_initiation`: 送金（金額・送金先・口座指定）
   - `account_information`: 口座情報照会（口座指定・期間指定）
-- [ ] RP にデモページを追加
+- [x] RP にデモページを追加
   - 「送金を許可する」シナリオ
     - `type: "payment_initiation"`, `actions: ["initiate"]`, `identifier: "account-123"` + 金額等のカスタムフィールド
   - 「口座情報を閲覧する」シナリオ
